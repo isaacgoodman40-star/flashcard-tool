@@ -237,24 +237,24 @@ if generate_btn and input_text:
         st.subheader("📤 Export Your Cards")
         col1, col2 = st.columns(2)
         
-       with col1:
-    pdf_bytes = create_pdf(edited_cards)
-    st.download_button(
-        label="📄 Download PDF (Printable)",
-        data=pdf_bytes,
-        file_name="flashcards.pdf",
-        mime="application/pdf"
-    )  # ✅ THIS bracket needs to be here!
+        with col1:
+            pdf_bytes = create_pdf(edited_cards)
+            st.download_button(
+                label="📄 Download PDF (Printable)",
+                data=pdf_bytes,
+                file_name="flashcards.pdf",
+                mime="application/pdf"
+            )  # ✅ THIS bracket needs to be here!
 
-with col2:
-    df = pd.DataFrame(edited_cards)
-    csv = df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="📄 Download CSV (Anki-ready)",
-        data=csv,
-        file_name="my_flashcards.csv",
-        mime="text/csv"
-    )
+        with col2:
+            df = pd.DataFrame(edited_cards)
+            csv = df.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                label="📄 Download CSV (Anki-ready)",
+                data=csv,
+                file_name="my_flashcards.csv",
+                mime="text/csv"
+            )
 
 
 # ----------------------
