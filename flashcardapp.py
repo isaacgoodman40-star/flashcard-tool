@@ -164,25 +164,28 @@ class PDF(FPDF):
         self.ln(5)
 
 def create_pdf(cards):
-    pdf = PDF(orientation="P", unit="mm", format="A4")
-    pdf.add_page()
-    pdf.set_font("Helvetica", size=10)
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
     
-    page_width = pdf.w - 2 * pdf.l_margin
+    for i, (question, answer) in enumerate(cards.items(), 1):
+        pdf.add_page()
+        pdf.set_font("Arial", size=16)
+        pdf.cell(200, 10, txt=f"Card {i} — Question", ln=True, align='C')
+        pdf.ln(10)
+        pdf.set_font("Arial", size=12)
+        pdf.multi_cell(0, 10, txt=question)
+        pdf.ln(10)
+        pdf.set_font("Arial", size=14)
+        pdf.cell(200, 10, txt="Answer:", ln=True)
+        pdf.set_font("Arial", size=12)
+        pdf.multi_cell(0, 10, txt=str(answer))
     
-    for i, card in enumerate(cards, 1):
-        pdf.set_fill_color(230, 240, 255)
-        pdf.multi_cell(page_width, 7, f"Q{i}: {card['question']}", fill=True)
-        pdf.multi_cell(page_width, 6, f"A: {card['answer']}")
-        pdf.ln(4)
-        pdf.set_draw_color(200, 200, 200)
-        pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
-        pdf.ln(4)
-    
+    # ✅ Fixed version — works on Streamlit Cloud
+    from io import BytesIO
     buffer = BytesIO()
     pdf.output(buffer)
     buffer.seek(0)
-    return bytes(buffer.read())
+    return buffer.getvalue()
 
 # ----------------------
 # 🔍 CARD PARSING
@@ -234,24 +237,25 @@ if generate_btn and input_text:
         st.subheader("📤 Export Your Cards")
         col1, col2 = st.columns(2)
         
-        with col1:
-            pdf_bytes = create_pdf(edited_cards)
-            st.download_button(
-                label="📄 Download PDF (Printable)",
-                data=pdf_bytes,
-                file_name="my_flashcards.pdf",
-                mime="application/pdf"
-            )
-        
-        with col2:
-            df = pd.DataFrame(edited_cards)
-            csv = df.to_csv(index=False).encode("utf-8")
-            st.download_button(
-                label="🃏 Download CSV (Anki-ready)",
-                data=csv,
-                file_name="my_flashcards.csv",
-                mime="text/csv"
-            )
+       with col1:
+    pdf_bytes = create_pdf(edited_cards)
+    st.download_button(
+        label="📄 Download PDF (Printable)",
+        data=pdf_bytes,
+        file_name="flashcards.pdf",
+        mime="application/pdf"
+    )  # ✅ THIS bracket needs to be here!
+
+with col2:
+    df = pd.DataFrame(edited_cards)
+    csv = df.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label="📄 Download CSV (Anki-ready)",
+        data=csv,
+        file_name="my_flashcards.csv",
+        mime="text/csv"
+    )
+
 
 # ----------------------
 # 🔐 ADMIN PANEL
