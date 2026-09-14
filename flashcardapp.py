@@ -4,19 +4,20 @@ from fpdf import FPDF
 from io import BytesIO
 from datetime import datetime
 import json
+import tempfile
+import os
 
 # ----------------------
-# 🔑 CONFIG — UPDATE THESE!
+# CONFIG
 # ----------------------
 MAX_FREE_CARDS = 99999
 ADMIN_PIN = "1234"
 
-# Google Sheets Settings
 GSHEET_SPREADSHEET_ID = "CTRN1LvOOVB9L9X5u-GUc_DGsWdNZUqSvoCgI9pp4PX0"
 GSHEET_SHEET_NAME = "usage_stats"
 
 # ----------------------
-# 📊 GOOGLE SHEETS INTEGRATION
+# GOOGLE SHEETS
 # ----------------------
 def get_gsheets_credentials():
     if "gcp_service_account" in st.secrets:
@@ -27,21 +28,13 @@ def log_to_gsheet(event_type, extra=None):
     try:
         from googleapiclient.discovery import build
         from google.oauth2.service_account import Credentials
-        
         creds_dict = get_gsheets_credentials()
         if not creds_dict:
             return False
-            
         SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
         creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
         service = build("sheets", "v4", credentials=creds)
-        
-        row = [
-            datetime.now().isoformat(),
-            event_type,
-            str(extra.get("count", "") if extra else "")
-        ]
-        
+        row = [datetime.now().isoformat(), event_type, str(extra.get("count", "") if extra else "")]
         body = {"values": [row]}
         service.spreadsheets().values().append(
             spreadsheetId=GSHEET_SPREADSHEET_ID,
@@ -57,28 +50,22 @@ def get_stats_from_gsheet():
     try:
         from googleapiclient.discovery import build
         from google.oauth2.service_account import Credentials
-        
         creds_dict = get_gsheets_credentials()
         if not creds_dict:
             return None
-            
         SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
         creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
         service = build("sheets", "v4", credentials=creds)
-        
         result = service.spreadsheets().values().get(
             spreadsheetId=GSHEET_SPREADSHEET_ID,
             range=f"{GSHEET_SHEET_NAME}!A:C"
         ).execute()
-        
         rows = result.get("values", [])
         if not rows:
             return {"total_loads": 0, "total_generations": 0, "total_cards_made": 0, "recent": []}
-        
         total_loads = sum(1 for r in rows if len(r)>=2 and r[1]=="app_load")
         total_gens = sum(1 for r in rows if len(r)>=2 and r[1]=="generate")
         total_cards = sum(int(r[2]) for r in rows if len(r)>=3 and r[2].isdigit())
-        
         return {
             "total_loads": total_loads,
             "total_generations": total_gens,
@@ -89,34 +76,26 @@ def get_stats_from_gsheet():
         return None
 
 # ----------------------
-# 📝 LOCAL FALLBACK LOGGING
+# LOCAL LOGGING
 # ----------------------
 USAGE_LOG_FILE = "usage_stats.json"
 
 def log_usage(event_type, extra=None):
-    logged_to_gsheet = log_to_gsheet(event_type, extra)
+    log_to_gsheet(event_type, extra)
     try:
         try:
             with open(USAGE_LOG_FILE, "r") as f:
                 stats = json.load(f)
         except FileNotFoundError:
             stats = {"total_loads": 0, "total_generations": 0, "total_cards_made": 0, "sessions": []}
-        
         if event_type == "app_load":
             stats["total_loads"] += 1
         elif event_type == "generate":
             stats["total_generations"] += 1
             stats["total_cards_made"] += extra.get("count", 0)
-        
-        stats["sessions"].append({
-            "time": datetime.now().isoformat(),
-            "event": event_type,
-            "extra": extra or {}
-        })
-        
+        stats["sessions"].append({"time": datetime.now().isoformat(), "event": event_type, "extra": extra or {}})
         if len(stats["sessions"]) > 200:
             stats["sessions"] = stats["sessions"][-200:]
-        
         with open(USAGE_LOG_FILE, "w") as f:
             json.dump(stats, f, indent=2)
     except Exception:
@@ -133,7 +112,7 @@ def get_stats():
         return {"total_loads": 0, "total_generations": 0, "total_cards_made": 0, "sessions": []}
 
 # ----------------------
-# 📄 PDF EXPORT — NO EMOJIS, ENCODING SAFE
+# PDF — FIXED BUFFER METHOD
 # ----------------------
 class PDF(FPDF):
     def header(self):
@@ -166,13 +145,17 @@ def create_pdf(cards):
         a_clean = answer.encode("latin-1", errors="replace").decode("latin-1")
         pdf.multi_cell(0, 10, txt=a_clean)
     
-    buffer = BytesIO()
-    pdf.output(buffer)
-    buffer.seek(0)
-    return buffer.getvalue()
+    # ✅ FIX: Use temp file — works in ALL fpdf versions
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        temp_path = tmp.name
+    pdf.output(temp_path)
+    with open(temp_path, "rb") as f:
+        pdf_bytes = f.read()
+    os.remove(temp_path)
+    return pdf_bytes
 
 # ----------------------
-# 🔍 CARD PARSING
+# PARSE NOTES
 # ----------------------
 def parse_notes(text):
     cards = []
@@ -190,7 +173,7 @@ def parse_notes(text):
     return cards
 
 # ----------------------
-# 📄 PAGE SETUP
+# PAGE SETUP
 # ----------------------
 st.set_page_config(page_title="Smart Flashcard Generator", layout="wide")
 
@@ -203,7 +186,7 @@ st.subheader("Turn your notes into study cards - instantly")
 st.info("Beta - unlimited cards for everyone! No sign-up required.")
 
 # ----------------------
-# 🎯 MAIN APP
+# MAIN APP
 # ----------------------
 input_text = st.text_area(
     "Paste your notes below",
@@ -254,7 +237,7 @@ if generate_btn and input_text:
             )
 
 # ----------------------
-# 🔐 ADMIN PANEL
+# ADMIN PANEL
 # ----------------------
 st.divider()
 pin_input = st.text_input("Admin - View Stats", type="password", key="admin_pin")
