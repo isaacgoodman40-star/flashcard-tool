@@ -167,25 +167,29 @@ def create_pdf(cards):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     
-    for i, (question, answer) in enumerate(cards.items(), 1):
+    # ✅ Works with LIST format — your setup!
+    for i, card in enumerate(cards, 1):
+        question = card["question"]
+        answer = card["answer"]
+        
         pdf.add_page()
         pdf.set_font("Arial", size=16)
         pdf.cell(200, 10, txt=f"Card {i} — Question", ln=True, align='C')
         pdf.ln(10)
         pdf.set_font("Arial", size=12)
-        pdf.multi_cell(0, 10, txt=question)
+        pdf.multi_cell(0, 10, txt=str(question))
         pdf.ln(10)
         pdf.set_font("Arial", size=14)
         pdf.cell(200, 10, txt="Answer:", ln=True)
         pdf.set_font("Arial", size=12)
         pdf.multi_cell(0, 10, txt=str(answer))
     
-    # ✅ Fixed version — works on Streamlit Cloud
     from io import BytesIO
     buffer = BytesIO()
     pdf.output(buffer)
     buffer.seek(0)
     return buffer.getvalue()
+
 
 # ----------------------
 # 🔍 CARD PARSING
