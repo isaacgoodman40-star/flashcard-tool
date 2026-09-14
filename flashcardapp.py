@@ -12,7 +12,7 @@ MAX_FREE_CARDS = 99999  # Unlimited for everyone!
 ADMIN_PIN = "1234"  # ⚡ CHANGE THIS to your own secret PIN!
 
 # Google Sheets Settings
-GSHEET_SPREADSHEET_ID = CTRN1LvOOVB9L9X5u-GUc_DGsWdNZUqSvoCgI9pp4PX0
+GSHEET_SPREADSHEET_ID = "CTRN1LvOOVB9L9X5u-GUc_DGsWdNZUqSvoCgI9pp4PX0"
 GSHEET_SHEET_NAME = "usage_stats"
 
 # ----------------------
