@@ -8,8 +8,8 @@ import json
 # ----------------------
 # 🔑 CONFIG — UPDATE THESE!
 # ----------------------
-MAX_FREE_CARDS = 99999  # Unlimited for everyone!
-ADMIN_PIN = "1234"  # ⚡ CHANGE THIS to your own secret PIN!
+MAX_FREE_CARDS = 99999
+ADMIN_PIN = "1234"
 
 # Google Sheets Settings
 GSHEET_SPREADSHEET_ID = "CTRN1LvOOVB9L9X5u-GUc_DGsWdNZUqSvoCgI9pp4PX0"
@@ -19,26 +19,23 @@ GSHEET_SHEET_NAME = "usage_stats"
 # 📊 GOOGLE SHEETS INTEGRATION
 # ----------------------
 def get_gsheets_credentials():
-    """Load credentials from Streamlit secrets or local file"""
     if "gcp_service_account" in st.secrets:
         return dict(st.secrets["gcp_service_account"])
     return None
 
 def log_to_gsheet(event_type, extra=None):
-    """Log usage data directly to Google Sheets"""
     try:
         from googleapiclient.discovery import build
         from google.oauth2.service_account import Credentials
         
         creds_dict = get_gsheets_credentials()
         if not creds_dict:
-            return False  # Skip if no credentials set yet
+            return False
             
         SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
         creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
         service = build("sheets", "v4", credentials=creds)
         
-        # Prepare row data
         row = [
             datetime.now().isoformat(),
             event_type,
@@ -57,7 +54,6 @@ def log_to_gsheet(event_type, extra=None):
         return False
 
 def get_stats_from_gsheet():
-    """Pull and calculate stats from Google Sheets"""
     try:
         from googleapiclient.discovery import build
         from google.oauth2.service_account import Credentials
@@ -87,7 +83,7 @@ def get_stats_from_gsheet():
             "total_loads": total_loads,
             "total_generations": total_gens,
             "total_cards_made": total_cards,
-            "recent": rows[-10:]  # Last 10 entries
+            "recent": rows[-10:]
         }
     except Exception:
         return None
@@ -98,10 +94,7 @@ def get_stats_from_gsheet():
 USAGE_LOG_FILE = "usage_stats.json"
 
 def log_usage(event_type, extra=None):
-    """Log to Google Sheets first, fall back to local file"""
     logged_to_gsheet = log_to_gsheet(event_type, extra)
-    
-    # Always keep local copy too
     try:
         try:
             with open(USAGE_LOG_FILE, "r") as f:
@@ -130,11 +123,9 @@ def log_usage(event_type, extra=None):
         pass
 
 def get_stats():
-    """Prefer Google Sheets data, fall back to local"""
     gsheet_stats = get_stats_from_gsheet()
     if gsheet_stats and gsheet_stats["total_loads"] > 0:
         return gsheet_stats
-    
     try:
         with open(USAGE_LOG_FILE, "r") as f:
             return json.load(f)
@@ -142,7 +133,7 @@ def get_stats():
         return {"total_loads": 0, "total_generations": 0, "total_cards_made": 0, "sessions": []}
 
 # ----------------------
-# 📄 PDF EXPORT — FIXED & COMPLETE
+# 📄 PDF EXPORT — NO EMOJIS, ENCODING SAFE
 # ----------------------
 class PDF(FPDF):
     def header(self):
@@ -151,7 +142,7 @@ class PDF(FPDF):
         self.ln(5)
 
 def create_pdf(cards):
-    pdf = PDF()  # Uses your custom PDF class
+    pdf = PDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     
     for i, card in enumerate(cards, 1):
@@ -160,10 +151,9 @@ def create_pdf(cards):
         
         pdf.add_page()
         pdf.set_font("Helvetica", "B", 16)
-        pdf.cell(200, 10, txt=f"Card {i} — Question", ln=True, align='C')
+        pdf.cell(200, 10, txt=f"Card {i} - Question", ln=True, align='C')
         pdf.ln(10)
         
-        # Safe encoding for special characters
         pdf.set_font("Helvetica", size=12)
         q_clean = question.encode("latin-1", errors="replace").decode("latin-1")
         pdf.multi_cell(0, 10, txt=q_clean)
@@ -208,9 +198,9 @@ if "logged_load" not in st.session_state:
     log_usage("app_load")
     st.session_state.logged_load = True
 
-st.title("📝 Smart Flashcard Generator")
-st.subheader("Turn your notes into study cards — instantly")
-st.info("✨ Beta — unlimited cards for everyone! No sign-up required.")
+st.title("Smart Flashcard Generator")
+st.subheader("Turn your notes into study cards - instantly")
+st.info("Beta - unlimited cards for everyone! No sign-up required.")
 
 # ----------------------
 # 🎯 MAIN APP
@@ -221,19 +211,19 @@ input_text = st.text_area(
     placeholder="Examples:\nCapital of France = Paris\nPhotosynthesis: Plants use sunlight to make energy"
 )
 
-generate_btn = st.button("✨ Generate Flashcards", type="primary")
+generate_btn = st.button("Generate Flashcards", type="primary")
 
 if generate_btn and input_text:
     raw_cards = parse_notes(input_text)
     
     if not raw_cards:
-        st.warning("⚠️ Couldn't detect cards. Use `question = answer` or `question: answer` format")
+        st.warning("Could not detect cards. Use 'question = answer' or 'question: answer' format")
     else:
         log_usage("generate", {"count": len(raw_cards)})
-        st.success(f"✅ Generated {len(raw_cards)} cards!")
+        st.success(f"Generated {len(raw_cards)} cards!")
         display_cards = raw_cards
         
-        st.subheader("✏️ Review & Edit Cards")
+        st.subheader("Review & Edit Cards")
         edited_cards = []
         for idx, card in enumerate(display_cards):
             with st.expander(f"Card {idx+1}", expanded=True):
@@ -241,13 +231,13 @@ if generate_btn and input_text:
                 a = st.text_input(f"Answer {idx+1}", value=card["answer"], key=f"a_{idx}")
                 edited_cards.append({"question": q, "answer": a})
         
-        st.subheader("📤 Export Your Cards")
+        st.subheader("Export Your Cards")
         col1, col2 = st.columns(2)
         
         with col1:
             pdf_bytes = create_pdf(edited_cards)
             st.download_button(
-                label="📄 Download PDF (Printable)",
+                label="Download PDF (Printable)",
                 data=pdf_bytes,
                 file_name="flashcards.pdf",
                 mime="application/pdf"
@@ -257,7 +247,7 @@ if generate_btn and input_text:
             df = pd.DataFrame(edited_cards)
             csv = df.to_csv(index=False).encode("utf-8")
             st.download_button(
-                label="📄 Download CSV (Anki-ready)",
+                label="Download CSV (Anki-ready)",
                 data=csv,
                 file_name="my_flashcards.csv",
                 mime="text/csv"
@@ -267,20 +257,21 @@ if generate_btn and input_text:
 # 🔐 ADMIN PANEL
 # ----------------------
 st.divider()
-pin_input = st.text_input("Admin — View Stats", type="password", key="admin_pin")
+pin_input = st.text_input("Admin - View Stats", type="password", key="admin_pin")
 if pin_input == ADMIN_PIN:
     stats = get_stats()
     if stats:
-        st.subheader("📊 Live Usage Dashboard")
+        st.subheader("Live Usage Dashboard")
         col_a, col_b, col_c = st.columns(3)
         col_a.metric("Total Visits", stats.get("total_loads", 0))
         col_b.metric("Card Generations", stats.get("total_generations", 0))
         col_c.metric("Total Cards Created", stats.get("total_cards_made", 0))
         
-        st.caption("✅ Data synced to Google Sheets — permanent & accessible anywhere")
+        st.caption("Data synced to Google Sheets - permanent and accessible anywhere")
         
         if "recent" in stats and stats["recent"]:
-            with st.expander("📋 Recent Activity"):
+            with st.expander("Recent Activity"):
                 for row in reversed(stats["recent"]):
                     if isinstance(row, list) and len(row) >= 2:
-                        st.write(f"{row[0]} — {row[1]} {f'({row[2]} cards)' if len(row)>=3 and row[2] else ''}")
+                        extra_text = f" ({row[2]} cards)" if len(row)>=3 and row[2] else ""
+                        st.write(f"{row[0]} - {row[1]}{extra_text}")
