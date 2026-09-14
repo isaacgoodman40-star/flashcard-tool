@@ -142,20 +142,7 @@ def get_stats():
         return {"total_loads": 0, "total_generations": 0, "total_cards_made": 0, "sessions": []}
 
 # ----------------------
-# � PAGE SETUP
-# ----------------------
-st.set_page_config(page_title="Smart Flashcard Generator", layout="wide")
-
-if "logged_load" not in st.session_state:
-    log_usage("app_load")
-    st.session_state.logged_load = True
-
-st.title("📝 Smart Flashcard Generator")
-st.subheader("Turn your notes into study cards — instantly")
-st.info("✨ Beta — unlimited cards for everyone! No sign-up required.")
-
-# ----------------------
-# 📄 PDF EXPORT FUNCTION
+# 📄 PDF EXPORT — FIXED & COMPLETE
 # ----------------------
 class PDF(FPDF):
     def header(self):
@@ -164,32 +151,35 @@ class PDF(FPDF):
         self.ln(5)
 
 def create_pdf(cards):
-    pdf = FPDF()
+    pdf = PDF()  # Uses your custom PDF class
     pdf.set_auto_page_break(auto=True, margin=15)
     
-    # ✅ Works with LIST format — your setup!
     for i, card in enumerate(cards, 1):
         question = card["question"]
         answer = card["answer"]
         
         pdf.add_page()
-        pdf.set_font("Arial", size=16)
+        pdf.set_font("Helvetica", "B", 16)
         pdf.cell(200, 10, txt=f"Card {i} — Question", ln=True, align='C')
         pdf.ln(10)
-        pdf.set_font("Arial", size=12)
-        pdf.multi_cell(0, 10, txt=str(question))
+        
+        # Safe encoding for special characters
+        pdf.set_font("Helvetica", size=12)
+        q_clean = question.encode("latin-1", errors="replace").decode("latin-1")
+        pdf.multi_cell(0, 10, txt=q_clean)
         pdf.ln(10)
-        pdf.set_font("Arial", size=14)
+        
+        pdf.set_font("Helvetica", "B", 14)
         pdf.cell(200, 10, txt="Answer:", ln=True)
-        pdf.set_font("Arial", size=12)
-        pdf.multi_cell(0, 10, txt=str(answer))
+        
+        pdf.set_font("Helvetica", size=12)
+        a_clean = answer.encode("latin-1", errors="replace").decode("latin-1")
+        pdf.multi_cell(0, 10, txt=a_clean)
     
-    from io import BytesIO
     buffer = BytesIO()
     pdf.output(buffer)
     buffer.seek(0)
     return buffer.getvalue()
-
 
 # ----------------------
 # 🔍 CARD PARSING
@@ -208,6 +198,19 @@ def parse_notes(text):
             q, a = line.split(":", 1)
             cards.append({"question": q.strip(), "answer": a.strip()})
     return cards
+
+# ----------------------
+# 📄 PAGE SETUP
+# ----------------------
+st.set_page_config(page_title="Smart Flashcard Generator", layout="wide")
+
+if "logged_load" not in st.session_state:
+    log_usage("app_load")
+    st.session_state.logged_load = True
+
+st.title("📝 Smart Flashcard Generator")
+st.subheader("Turn your notes into study cards — instantly")
+st.info("✨ Beta — unlimited cards for everyone! No sign-up required.")
 
 # ----------------------
 # 🎯 MAIN APP
@@ -248,7 +251,7 @@ if generate_btn and input_text:
                 data=pdf_bytes,
                 file_name="flashcards.pdf",
                 mime="application/pdf"
-            )  # ✅ THIS bracket needs to be here!
+            )
 
         with col2:
             df = pd.DataFrame(edited_cards)
@@ -259,7 +262,6 @@ if generate_btn and input_text:
                 file_name="my_flashcards.csv",
                 mime="text/csv"
             )
-
 
 # ----------------------
 # 🔐 ADMIN PANEL
