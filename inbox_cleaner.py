@@ -9,7 +9,7 @@ import pandas as pd
 # ----------------------
 # 🔑 CONFIG
 # ----------------------
-ADMIN_PIN = "1234"
+ADMIN_PIN = "20021006"
 
 # 💰 SUPPORT LINK — UPDATE THIS IF YOU WANT!
 SUPPORT_LINK = "https://buymeacoffee.com/isaacgoodman"  # ← Change to your link later!
