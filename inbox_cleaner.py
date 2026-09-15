@@ -196,7 +196,7 @@ st.info("✨ Your login details never leave your browser — used only for this 
 
 # 💰 SUPPORT SECTION — NEW!
 st.markdown("""
-<div style="padding: 12px; background: linear-gradient(90deg, #fff8e1, #fff3e0); border-radius: 8px; margin-bottom: 20px;">
+<div style="padding: 12px; background: linear-gradient(90deg, #fff8e1, #fff3e0); border-radius: 8px; margin-bottom: 20px; color: #000000;">
 💛 <b>This tool is free for everyone!</b> If it helps you out, you can support its development with a small contribution — totally optional, no pressure at all ❤️
 </div>
 """, unsafe_allow_html=True)
