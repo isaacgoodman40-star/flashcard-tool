@@ -10,7 +10,7 @@ import pandas as pd
 # 🔑 CONFIG — SET EVERYTHING HERE!
 # ----------------------
 APP_NAME = "Smart Inbox Cleaner"
-SUPPORT_LINK = "https://buymeacoffee.com/isaacgoodman"
+SUPPORT_LINK = "https://buymeacoffee.com/isaacgoodman/e/576661"
 
 # 💰 FREE vs PREMIUM LIMITS
 FREE_DAYS_LIMIT = 30
