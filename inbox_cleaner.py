@@ -89,19 +89,27 @@ def connect_email(email_addr, password):
     except Exception as e:
         return None, f"Error: {str(e)}"
 
+# ✅ FIXED DECODE FUNCTION — handles ALL edge cases safely
 def decode_str(s):
     if not s: return ""
-    decoded = decode_header(s)
-    parts = []
-    for content, encoding in decoded:
-        if isinstance(content, bytes):
-            parts.append(content.decode(encoding or "utf-8", errors="replace"))
-        else:
-            parts.append(str(content))
-    return "".join(parts)
+    try:
+        decoded = decode_header(s)
+        parts = []
+        for content, encoding in decoded:
+            if content is None:
+                continue
+            if isinstance(content, bytes):
+                try:
+                    parts.append(content.decode(encoding or "utf-8", errors="replace"))
+                except:
+                    parts.append(content.decode("utf-8", errors="replace"))
+            else:
+                parts.append(str(content))
+        return "".join(parts)
+    except Exception as e:
+        return str(s)  # Fallback — just return as-is
 
 def parse_email_date(date_str):
-    """Convert email date string to datetime object for sorting"""
     try:
         return email.utils.parsedate_to_datetime(date_str)
     except:
@@ -126,12 +134,18 @@ def extract_unsubscribe_link(msg):
                 if part.get_content_type() in ["text/plain", "text/html"]:
                     try:
                         payload = part.get_payload(decode=True)
-                        body += payload.decode("utf-8", errors="ignore") if isinstance(payload, bytes) else str(payload)
+                        if isinstance(payload, bytes):
+                            body += payload.decode("utf-8", errors="replace")
+                        else:
+                            body += str(payload)
                     except: pass
         else:
             try:
                 payload = msg.get_payload(decode=True)
-                body = payload.decode("utf-8", errors="ignore") if isinstance(payload, bytes) else str(payload)
+                if isinstance(payload, bytes):
+                    body += payload.decode("utf-8", errors="replace")
+                else:
+                    body += str(payload)
             except: pass
         patterns = [
             r'href=["\'](https?://[^"\']+?unsubscribe[^"\']*?)["\']',
@@ -200,29 +214,32 @@ def scan_inbox(mail, limit_days=30, max_emails=500):
         if status != "OK": continue
         for response_part in msg_data:
             if isinstance(response_part, tuple):
-                msg = email.message_from_bytes(response_part[1])
-                sender_full = decode_str(msg.get("From", ""))
-                subject = decode_str(msg.get("Subject", ""))
-                date_str = msg.get("Date", "")
-                date_dt = parse_email_date(date_str)
-                
-                email_match = re.search(r'[\w\.-]+@[\w\.-]+', sender_full)
-                sender_email = email_match.group(0).lower() if email_match else sender_full.lower()
-                
-                unsubscribe_url = extract_unsubscribe_link(msg)
-                category, reason = categorise_email(sender_email, subject, unsubscribe_url)
-                
-                results.append({
-                    "id": eid.decode() if isinstance(eid, bytes) else str(eid),
-                    "sender_full": sender_full,
-                    "sender_email": sender_email,
-                    "subject": subject,
-                    "date": date_str,
-                    "date_dt": date_dt,
-                    "category": category,
-                    "reason": reason,
-                    "unsubscribe_url": unsubscribe_url
-                })
+                try:
+                    msg = email.message_from_bytes(response_part[1])
+                    sender_full = decode_str(msg.get("From", ""))
+                    subject = decode_str(msg.get("Subject", ""))
+                    date_str = msg.get("Date", "")
+                    date_dt = parse_email_date(date_str)
+                    
+                    email_match = re.search(r'[\w\.-]+@[\w\.-]+', sender_full)
+                    sender_email = email_match.group(0).lower() if email_match else sender_full.lower()
+                    
+                    unsubscribe_url = extract_unsubscribe_link(msg)
+                    category, reason = categorise_email(sender_email, subject, unsubscribe_url)
+                    
+                    results.append({
+                        "id": eid.decode() if isinstance(eid, bytes) else str(eid),
+                        "sender_full": sender_full,
+                        "sender_email": sender_email,
+                        "subject": subject,
+                        "date": date_str,
+                        "date_dt": date_dt,
+                        "category": category,
+                        "reason": reason,
+                        "unsubscribe_url": unsubscribe_url
+                    })
+                except Exception as e:
+                    continue  # Skip any truly unreadable emails
     return results
 
 # ----------------------
@@ -269,10 +286,10 @@ st.set_page_config(page_title=APP_NAME, layout="wide")
 st.title("🧹 " + APP_NAME)
 st.subheader("Scan, sort, unsubscribe, and clear bulk — safely")
 
-# SUPPORT BANNER
+# 💛 SUPPORT BANNER
 banner = f"""
 <div style="padding: 12px; background: linear-gradient(90deg, #fff8e1, #fff3e0); border-radius: 8px; margin-bottom: 20px; color: #000000;">
- <b>This tool is free for everyone!</b> Unlock full cleaning forever for just {PREMIUM_PRICE} 
+💛 <b>This tool is free for everyone!</b> Unlock full cleaning forever for just {PREMIUM_PRICE} ❤️
 </div>
 """
 st.markdown(banner, unsafe_allow_html=True)
@@ -419,31 +436,24 @@ if connect_btn and email_addr and password:
             marketing_df = df[df["category"] == "📢 Marketing"].copy()
             
             if len(marketing_df) > 0:
-                # Group by sender email
                 sender_groups = marketing_df.groupby("sender_email")
-                
                 st.info(f"Found {sender_groups.ngroups} marketing senders — click to see emails")
                 
                 selected_senders = []
                 
-                # Process each sender group
                 for sender_email, group in sender_groups:
-                    # Sort newest first
                     group_sorted = group.sort_values("date_dt", ascending=False).reset_index(drop=True)
                     count = len(group_sorted)
                     newest = group_sorted.iloc[0]
                     newest_unsub = newest["unsubscribe_url"]
                     display_name = newest["sender_full"].split("<")[0].strip() if "<" in newest["sender_full"] else sender_email
                     
-                    # Build unsubscribe link HTML
                     if newest_unsub and isinstance(newest_unsub, str) and newest_unsub.startswith("http"):
                         unsub_html = f'<a href="{newest_unsub}" target="_blank" style="display:inline-block; padding:4px 12px; background:#ff4b4b; color:white; border-radius:4px; text-decoration:none; font-weight:bold; font-size:0.9em;">🔗 Unsubscribe</a>'
                     else:
                         unsub_html = '<span style="color:#999; font-size:0.9em;">No link</span>'
                     
-                    # --- Expandable section ---
                     with st.expander(f"📬 {display_name} — {count} email{'s' if count != 1 else ''}"):
-                        # Top row: checkbox + unsubscribe
                         c1, c2, c3 = st.columns([3, 2, 1])
                         with c1:
                             checked = st.checkbox(
@@ -458,19 +468,13 @@ if connect_btn and email_addr and password:
                             st.markdown(unsub_html, unsafe_allow_html=True)
                         
                         st.divider()
-                        
-                        # List every email from this sender
                         st.markdown("**All emails in this period:**")
                         for idx, email_row in group_sorted.iterrows():
                             date_preview = str(email_row["date"])[:25]
-                            st.markdown(f"""
-                            • **{date_preview}**<br>
-                              {email_row['subject']}
-                            """, unsafe_allow_html=True)
+                            st.markdown(f"• **{date_preview}**<br>&nbsp;&nbsp;{email_row['subject']}", unsafe_allow_html=True)
                             if idx < len(group_sorted) - 1:
                                 st.markdown("<hr style='margin:4px 0; border:none; border-top:1px solid #eee;'>", unsafe_allow_html=True)
                 
-                # --- Confirm & Delete Section ---
                 if selected_senders:
                     total_to_del = len(marketing_df[marketing_df["sender_email"].isin(selected_senders)])
                     st.warning(f"⚠️ You've selected **{len(selected_senders)} sender(s)** → **{total_to_del} emails** will be moved to Trash")
