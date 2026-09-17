@@ -8,9 +8,10 @@ st.title("Inbox Cleaner")
 st.write("A privacy-first way to clean your inbox.")
 st.success("The application is running.")
 st.divider()
-st.subheader("privacy")
-st.write("Your email will only be accessed when you explicitly connect it.")
-if st.button("Disconnect and clear session"):
-  st.session_state.clear()
-  st.rerun()
+st.subheader("Connect your mailbox")
+st.write("connect your email account securely using your provider's sign-in page.")
+if st.button("Connect Gmail"):
+    st.info("Gmail connection will be added in the next step.")
+  
+
   
