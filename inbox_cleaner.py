@@ -295,35 +295,94 @@ def check_premium_status():
     return st.session_state.is_premium
 
 # ----------------------
-# 📄 PAGE SETUP
+# 📄 PAGE SETUP + FULL STYLE FIX
 # ----------------------
 st.set_page_config(page_title=APP_NAME, layout="wide")
 
-# ✅ ↓ PASTE THESE LINES RIGHT HERE ↓ ✅
+# 🎨 COMPLETE STYLE FIX — ALL COLOURS & LINK STYLES
 st.markdown("""
 <style>
-/* Global text — white on dark */
-html, body, [class*="css"] { color: #ffffff !important; }
-h1, h2, h3, h4, h5, h6 { color: #ffffff !important; }
-small, .stCaption, .stHelp { color: #bbbbbb !important; }
-.streamlit-expanderHeader { color: #ffffff !important; }
-.stTextInput label, .stPassword label, .stSelectbox label, .stSlider label { color: #ffffff !important; }
-/* Keep alert boxes readable — dark text on light bg */
-.stAlert, .stInfo, .stWarning, .stSuccess, .stError { color: #000000 !important; }
+/* Global text: white on dark background */
+html, body, [class*="css"] {
+    color: #ffffff !important;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+    color: #ffffff !important;
+}
+
+/* Small helper text */
+small, .stCaption, .stHelp {
+    color: #bbbbbb !important;
+}
+
+/* Expander headers */
+.streamlit-expanderHeader {
+    color: #ffffff !important;
+}
+
+/* Input labels */
+.stTextInput label, .stPassword label, .stSelectbox label, .stSlider label {
+    color: #ffffff !important;
+}
+
+/* Metric text */
+.stMetric label, .stMetric [data-testid="stMetricValue"] {
+    color: #ffffff !important;
+}
+
+/* Alert boxes: dark text on light background */
+.stAlert, .stInfo, .stWarning, .stSuccess, .stError {
+    color: #000000 !important;
+}
+
+/* ALL BUY ME A COFFEE LINKS — BLUE + UNDERLINED + BOLD */
+a[href*="buymeacoffee.com"],
+a[href*="SUPPORT_LINK"] {
+    color: #4285F4 !important;
+    text-decoration: underline !important;
+    font-weight: bold !important;
+}
+
+/* Light-coloured banner boxes: dark text so it's readable */
+div[style*="background:#fff8e1"],
+div[style*="background: #fff8e1"],
+div[style*="background:#fff3e0"],
+div[style*="background: #fff3e0"],
+div[style*="background:#e8f5e9"],
+div[style*="background: #e8f5e9"] {
+    color: #000000 !important;
+}
+
+/* Links INSIDE light banners — also BLUE + UNDERLINED */
+div[style*="background:#fff8e1"] a,
+div[style*="background: #fff8e1"] a,
+div[style*="background:#fff3e0"] a,
+div[style*="background: #fff3e0"] a,
+div[style*="background:#e8f5e9"] a,
+div[style*="background: #e8f5e9"] a {
+    color: #4285F4 !important;
+    text-decoration: underline !important;
+    font-weight: bold !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
+# ----------------------
+# 📌 PAGE CONTENT
+# ----------------------
 st.title("🧹 " + APP_NAME)
 st.subheader("Scan, sort, unsubscribe, and clear bulk — safely")
 
 banner = f"""
 <div style="padding: 12px; background: linear-gradient(90deg, #fff8e1, #fff3e0); border-radius: 8px; margin-bottom: 20px;">
 💛 <b>Free for {FREE_DAYS_LIMIT} days / {FREE_EMAILS_LIMIT} emails.</b> Full unlimited forever: <b>{PREMIUM_PRICE}</b> ❤️
-</div>
 """
-st.markdown(banner, unsafe_allow_html=True)
 if SUPPORT_LINK and "PASTE" not in SUPPORT_LINK:
-    st.markdown(f'<a href="{SUPPORT_LINK}" target="_blank" style="color: #000; font-weight: bold; text-decoration: none;">☕ Get Premium Access →</a>', unsafe_allow_html=True)
+    banner += f'<br><a href="{SUPPORT_LINK}" target="_blank">⭐ Get Premium Access — {PREMIUM_PRICE}</a>'
+banner += "</div>"
+st.markdown(banner, unsafe_allow_html=True)
 st.divider()
 
 # ----------------------
@@ -335,7 +394,7 @@ if not is_premium:
     with st.expander("⭐ Premium — Unlock Unlimited Scanning", expanded=False):
         st.markdown(f"""
         ### ✅ What Premium Gives You ({PREMIUM_PRICE} one-time)
-        - 🕰️ Scan **ALL** time ranges — no 30-day limit
+        - 🕰️ Scan **ALL** time ranges — no {FREE_DAYS_LIMIT}-day limit
         - 📬 Process **unlimited** emails — no cap
         - 🗑️ Bulk-delete from your **entire inbox history**
         - ✨ Forever access — one payment, lifetime use
@@ -388,7 +447,7 @@ with st.expander("📋 Important — Read First!", expanded=True):
     ### ⏳ Scan Times — Be Informed:
     | Range | Estimated Time |
     |---|---|
-    | Last 30 Days (Free) | ⚡ 30 secs – 3 mins |
+    | Last {FREE_DAYS_LIMIT} Days (Free) | ⚡ 30 secs – 3 mins |
     | Last 6 Months | ⏳ 5–15 mins |
     | Last 1 Year | ⏳ 15–30 mins |
     | All Time (Premium) | ⏳ **30–60+ mins** — see note |
@@ -441,7 +500,8 @@ if is_premium:
 else:
     scan_days = st.slider(f"Scan emails from last...", 7, FREE_DAYS_LIMIT, 30)
     max_scan = st.slider(f"Maximum emails to scan", 50, FREE_EMAILS_LIMIT, 200)
-    st.caption(f"Want to scan further back? ⭐ {PREMIUM_PRICE} unlocks all ranges forever!")
+    if SUPPORT_LINK and "PASTE" not in SUPPORT_LINK:
+        st.markdown(f"Want to scan further back? ⭐ <a href='{SUPPORT_LINK}' target='_blank'>Unlock Premium — {PREMIUM_PRICE}</a>", unsafe_allow_html=True)
 
 connect_btn = st.button("🔌 Connect & Scan Inbox", type="primary")
 
