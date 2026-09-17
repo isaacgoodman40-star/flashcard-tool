@@ -5,27 +5,30 @@ from email.header import decode_header
 import re
 from datetime import datetime, timedelta
 import pandas as pd
+import uuid
 
 # ----------------------
-# 🔑 CONFIG — SET EVERYTHING HERE!
+# 🔑 CONFIG — EDIT ALL HERE!
 # ----------------------
 APP_NAME = "Smart Inbox Cleaner"
 SUPPORT_LINK = "https://buymeacoffee.com/isaacgoodman/e/576661"
 
-# 💰 FREE vs PREMIUM LIMITS
+# 💰 PRICING & LIMITS
+PREMIUM_PRICE = "£5.00"
+PREMIUM_DESC = "Unlock unlimited scanning & bulk delete — forever!"
 FREE_DAYS_LIMIT = 30
 FREE_EMAILS_LIMIT = 500
 
-# 🔐 YOUR PREMIUM CODES — Add more as you sell them!
+# ==================================================
+# 🛡️ YOUR PREMIUM CODE DATABASE — ADD BUYERS HERE!
+# ==================================================
 PREMIUM_CODES = {
-    "CLEAN-2026-UNLIMITED": "Main Premium Code",
-    "ISAAC-ACCESS-999": "Personal Access",
-    # Add new codes here → "CLEAN-NAME-123": "Customer Name"
+    "CLEAN-2026-UNLIMITED": "Main Master Access",
+    "ISAAC-ACCESS-999": "Personal — Isaac",
+    # ↓ ADD NEW BUYERS HERE ↓
 }
 
-# 💳 SET YOUR PRICE
-PREMIUM_PRICE = "£5.00"
-PREMIUM_DESC = "Unlock unlimited scanning & bulk delete — forever!"
+SINGLE_USE_CODES = True
 
 # ----------------------
 # 🧠 DETECTION RULES
@@ -84,20 +87,18 @@ def connect_email(email_addr, password):
         return mail, None
     except imaplib.IMAP4.error as e:
         if "Authentication failed" in str(e):
-            return None, "❌ Login failed — use an App-Specific Password (not your normal one!)"
+            return None, "❌ Login failed — use an **App-Specific Password** (not your normal one!)"
         return None, f"Connection error: {str(e)}"
     except Exception as e:
         return None, f"Error: {str(e)}"
 
-# ✅ FIXED DECODE FUNCTION — handles ALL edge cases safely
 def decode_str(s):
     if not s: return ""
     try:
         decoded = decode_header(s)
         parts = []
         for content, encoding in decoded:
-            if content is None:
-                continue
+            if content is None: continue
             if isinstance(content, bytes):
                 try:
                     parts.append(content.decode(encoding or "utf-8", errors="replace"))
@@ -106,8 +107,8 @@ def decode_str(s):
             else:
                 parts.append(str(content))
         return "".join(parts)
-    except Exception as e:
-        return str(s)  # Fallback — just return as-is
+    except:
+        return str(s)
 
 def parse_email_date(date_str):
     try:
@@ -134,18 +135,12 @@ def extract_unsubscribe_link(msg):
                 if part.get_content_type() in ["text/plain", "text/html"]:
                     try:
                         payload = part.get_payload(decode=True)
-                        if isinstance(payload, bytes):
-                            body += payload.decode("utf-8", errors="replace")
-                        else:
-                            body += str(payload)
+                        body += payload.decode("utf-8", errors="replace") if isinstance(payload, bytes) else str(payload)
                     except: pass
         else:
             try:
                 payload = msg.get_payload(decode=True)
-                if isinstance(payload, bytes):
-                    body += payload.decode("utf-8", errors="replace")
-                else:
-                    body += str(payload)
+                body += payload.decode("utf-8", errors="replace") if isinstance(payload, bytes) else str(payload)
             except: pass
         patterns = [
             r'href=["\'](https?://[^"\']+?unsubscribe[^"\']*?)["\']',
@@ -209,12 +204,15 @@ def scan_inbox(mail, limit_days=30, max_emails=500):
         email_ids = email_ids[-max_emails:]
     
     results = []
-    for eid in email_ids:
-        status, msg_data = mail.fetch(eid, "(RFC822)")
-        if status != "OK": continue
-        for response_part in msg_data:
-            if isinstance(response_part, tuple):
-                try:
+    progress_bar = st.progress(0)
+    total = len(email_ids)
+    
+    for idx, eid in enumerate(email_ids):
+        try:
+            status, msg_data = mail.fetch(eid, "(RFC822)")
+            if status != "OK": continue
+            for response_part in msg_data:
+                if isinstance(response_part, tuple):
                     msg = email.message_from_bytes(response_part[1])
                     sender_full = decode_str(msg.get("From", ""))
                     subject = decode_str(msg.get("Subject", ""))
@@ -238,18 +236,22 @@ def scan_inbox(mail, limit_days=30, max_emails=500):
                         "reason": reason,
                         "unsubscribe_url": unsubscribe_url
                     })
-                except Exception as e:
-                    continue  # Skip any truly unreadable emails
+        except:
+            continue
+        
+        if idx % 20 == 0:
+            progress_bar.progress(min((idx + 1) / total, 1.0))
+    
+    progress_bar.empty()
     return results
 
 # ----------------------
-# 🗑️ BULK DELETE FUNCTION
+# 🗑️ BULK DELETE
 # ----------------------
 def delete_emails_by_sender(mail, sender_email_list):
     mail.select("INBOX")
     deleted_count = 0
     errors = []
-    
     for sender_email in sender_email_list:
         try:
             status, messages = mail.search(None, f'FROM "{sender_email}"')
@@ -260,23 +262,37 @@ def delete_emails_by_sender(mail, sender_email_list):
                 deleted_count += len(ids)
         except Exception as e:
             errors.append(f"{sender_email}: {str(e)}")
-    
     mail.expunge()
     return deleted_count, errors
 
 # ----------------------
 # 🔐 PREMIUM VERIFICATION
 # ----------------------
+def get_used_codes():
+    if "used_codes" not in st.session_state:
+        st.session_state.used_codes = set()
+    return st.session_state.used_codes
+
+def generate_new_code(name=""):
+    unique = str(uuid.uuid4())[:8].upper()
+    return f"CLEAN-{unique}"
+
+def verify_premium_code(input_code):
+    input_code = input_code.strip().upper()
+    if input_code not in PREMIUM_CODES:
+        return False, "❌ Code not recognised — check you entered it exactly or purchase one below"
+    if SINGLE_USE_CODES:
+        used = get_used_codes()
+        if input_code in used:
+            return False, "⚠️ This code has already been used — codes are single-use"
+        used.add(input_code)
+    st.session_state.is_premium = True
+    return True, PREMIUM_CODES[input_code]
+
 def check_premium_status():
     if "is_premium" not in st.session_state:
         st.session_state.is_premium = False
     return st.session_state.is_premium
-
-def verify_premium_code(input_code):
-    if input_code.strip().upper() in PREMIUM_CODES:
-        st.session_state.is_premium = True
-        return True, PREMIUM_CODES[input_code.strip().upper()]
-    return False, None
 
 # ----------------------
 # 📄 PAGE SETUP
@@ -286,50 +302,59 @@ st.set_page_config(page_title=APP_NAME, layout="wide")
 st.title("🧹 " + APP_NAME)
 st.subheader("Scan, sort, unsubscribe, and clear bulk — safely")
 
-# 💛 SUPPORT BANNER
 banner = f"""
-<div style="padding: 12px; background: linear-gradient(90deg, #fff8e1, #fff3e0); border-radius: 8px; margin-bottom: 20px; color: #000000;">
-💛 <b>This tool is free for everyone!</b> Unlock full cleaning forever for just {PREMIUM_PRICE} ❤️
+<div style="padding: 12px; background: linear-gradient(90deg, #fff8e1, #fff3e0); border-radius: 8px; margin-bottom: 20px;">
+💛 <b>Free for {FREE_DAYS_LIMIT} days / {FREE_EMAILS_LIMIT} emails.</b> Full unlimited forever: <b>{PREMIUM_PRICE}</b> ❤️
 </div>
 """
 st.markdown(banner, unsafe_allow_html=True)
-if SUPPORT_LINK and "yourname" not in SUPPORT_LINK:
-    st.markdown(f'<a href="{SUPPORT_LINK}" target="_blank" style="color: #000000; font-weight: bold; text-decoration: none;">☕ Get Premium Access →</a>', unsafe_allow_html=True)
+if SUPPORT_LINK and "PASTE" not in SUPPORT_LINK:
+    st.markdown(f'<a href="{SUPPORT_LINK}" target="_blank" style="color: #000; font-weight: bold; text-decoration: none;">☕ Get Premium Access →</a>', unsafe_allow_html=True)
 st.divider()
 
 # ----------------------
-# 🔐 PREMIUM CODE ENTRY
+# 🔐 PREMIUM PANEL
 # ----------------------
 is_premium = check_premium_status()
 
 if not is_premium:
-    with st.expander("⭐ Unlock Premium — Unlimited Scanning", expanded=False):
+    with st.expander("⭐ Premium — Unlock Unlimited Scanning", expanded=False):
         st.markdown(f"""
-        ### {PREMIUM_DESC}
-        - ✅ Scan **ALL** emails — no date limit
-        - ✅ Remove **unlimited** emails — no cap
-        - ✅ Bulk clean from your **entire inbox history**
-        - ✅ One-time payment → forever access ✨
-        - 💳 **Price: {PREMIUM_PRICE}** → [Buy here]({SUPPORT_LINK})
+        ### ✅ What Premium Gives You ({PREMIUM_PRICE} one-time)
+        - 🕰️ Scan **ALL** time ranges — no 30-day limit
+        - 📬 Process **unlimited** emails — no cap
+        - 🗑️ Bulk-delete from your **entire inbox history**
+        - ✨ Forever access — one payment, lifetime use
         
-        After purchase, enter your code below:
+        ⏳ **Note:** Scanning long periods takes time. Large inboxes = **30–60+ mins**.
+        Keep the tab open & your device awake.
+        
+        💳 **Step 1:** Purchase here → [Premium Access — {PREMIUM_PRICE}]({SUPPORT_LINK})  
+        📧 **Step 2:** You'll receive your unique code by message  
+        🔓 **Step 3:** Enter your code below to unlock
         """)
         
-        user_code = st.text_input("Enter Your Premium Code", type="password", placeholder="XXXX-XXXX-XXXX", key="premium_code_input")
-        code_submit = st.button("🔓 Unlock Premium", type="primary")
+        with st.expander("🔧 Admin — Generate New Buyer Code", expanded=False):
+            buyer_name = st.text_input("Buyer Name / Reference")
+            if st.button("🎁 Generate Unique Code") and buyer_name:
+                new_code = generate_new_code()
+                st.code(f'"{new_code}": "{buyer_name}"', language="python")
+                st.info("Copy this line into PREMIUM_CODES at the top of your code")
         
-        if code_submit and user_code:
-            valid, label = verify_premium_code(user_code)
+        st.divider()
+        user_code = st.text_input("Enter Your Premium Code", type="password", placeholder="CLEAN-XXXX-XXXX")
+        if st.button("🔓 Unlock Premium", type="primary") and user_code:
+            valid, message = verify_premium_code(user_code)
             if valid:
-                st.success(f"🌟 Premium Unlocked! Welcome — {label}")
+                st.success(f"🌟 Premium Unlocked! Welcome — {message}")
                 st.balloons()
                 is_premium = True
             else:
-                st.error("❌ Invalid code — check you entered it correctly")
+                st.error(message)
 else:
     st.markdown("""
-    <div style="background:#e8f5e9; padding:10px; border-radius:6px; border-left:4px solid:#2e7d32;">
-    ⭐ <b>PREMIUM ACTIVE</b> — Unlimited scanning enabled ✅
+    <div style="background:#e8f5e9; padding:12px; border-radius:6px; border-left:4px solid:#2e7d32;">
+    ⭐ <b>PREMIUM ACTIVE</b> — All time ranges available ✅
     </div>
     """, unsafe_allow_html=True)
     is_premium = True
@@ -342,27 +367,27 @@ st.divider()
 with st.expander("📋 Important — Read First!", expanded=True):
     st.markdown(f"""
     ### Connect Securely:
-    - **iCloud**: Use **App-Specific Password** → appleid.apple.com → Sign-In & Security → Generate Password
-    - **Gmail**: App Password → 2-Step ON first → myaccount.google.com/apppasswords
-    - **Never use your normal password** — always use an App Password ✅
+    - **iCloud**: App-Specific Password → appleid.apple.com → Sign-In & Security → Generate Password
+    - **Gmail**: 2-Step Verification ON first → App Password at myaccount.google.com/apppasswords
+    - Always use an **App Password**, not your normal login password ✅
     
-    ### 🆓 Free vs ⭐ Premium:
-    | Feature | Free | Premium |
-    |---|---|---|
-    | Scan Period | Last {FREE_DAYS_LIMIT} days | Unlimited — All Time |
-    | Max Emails | {FREE_EMAILS_LIMIT} | Unlimited |
-    | Bulk Delete | From last {FREE_DAYS_LIMIT} days | From your entire inbox |
+    ### ⏳ Scan Times — Be Informed:
+    | Range | Estimated Time |
+    |---|---|
+    | Last 30 Days (Free) | ⚡ 30 secs – 3 mins |
+    | Last 6 Months | ⏳ 5–15 mins |
+    | Last 1 Year | ⏳ 15–30 mins |
+    | All Time (Premium) | ⏳ **30–60+ mins** — see note |
+    
+    - Keep the tab open & device awake
+    - You can use your device while it runs
+    - **Tip:** Do large scans in chunks — e.g. "Last 6 months" first, then older periods ✅
     
     ### 📂 How It Works:
     - One expandable section per sender
-    - Click to see **every email** from them in the time period
-    - One unsubscribe link (uses the newest email)
+    - Click to see **every email** from them
+    - One unsubscribe link (uses newest email)
     - Tick once → delete ALL from that sender ✅
-    
-    ### Bulk Delete Safety:
-    - ✅ Emails go to **Trash/Deleted** — recoverable
-    - ✅ You **review & tick** before anything is removed
-    - ⚠️ Personal & Scam emails are **never auto-selected**
     """)
 
 # ----------------------
@@ -374,25 +399,35 @@ with col1:
 with col2:
     password = st.text_input("App Password / Special Password", type="password", placeholder="xxxx-xxxx-xxxx-xxxx")
 
-# 🎯 SCAN RANGE
-st.subheader("📅 Scan Settings")
+st.subheader("📅 Scan Range")
+
 if is_premium:
-    scan_mode = st.radio("Scan Range", [
-        f"Last {FREE_DAYS_LIMIT} days (Quick)",
-        "🌟 All Time (Unlimited — Premium)"
-    ], index=1)
+    scan_option = st.selectbox("Choose Time Range", [
+        f"Last {FREE_DAYS_LIMIT} Days (Quick)",
+        "Last 6 Months",
+        "Last 1 Year",
+        "All Time (Unlimited — Premium)"
+    ])
     
-    if "All Time" in scan_mode:
+    if "Last 30 Days" in scan_option:
+        scan_days = 30
+        max_scan = FREE_EMAILS_LIMIT
+    elif "Last 6 Months" in scan_option:
+        scan_days = 180
+        max_scan = None
+        st.info("⏳ Estimated: 5–15 mins — keep tab open")
+    elif "Last 1 Year" in scan_option:
+        scan_days = 365
+        max_scan = None
+        st.info("⏳ Estimated: 15–30 mins — keep tab open")
+    else:
         scan_days = None
         max_scan = None
-        st.info("🌟 Scanning your ENTIRE inbox — this may take a few minutes ⏳")
-    else:
-        scan_days = FREE_DAYS_LIMIT
-        max_scan = FREE_EMAILS_LIMIT
+        st.warning("⏳ Estimated: 30–60+ mins — keep tab open & device awake!")
 else:
     scan_days = st.slider(f"Scan emails from last...", 7, FREE_DAYS_LIMIT, 30)
     max_scan = st.slider(f"Maximum emails to scan", 50, FREE_EMAILS_LIMIT, 200)
-    st.caption(f"Want to scan further back? ⭐ Get Premium for unlimited scanning!")
+    st.caption(f"Want to scan further back? ⭐ {PREMIUM_PRICE} unlocks all ranges forever!")
 
 connect_btn = st.button("🔌 Connect & Scan Inbox", type="primary")
 
@@ -406,29 +441,24 @@ if connect_btn and email_addr and password:
     if error:
         st.error(error)
     else:
-        if scan_days is None:
-            with st.spinner("🔍 Scanning your ENTIRE inbox — please wait... ⏳"):
-                emails = scan_inbox(mail, limit_days=None, max_emails=None)
-        else:
-            with st.spinner(f"Scanning last {scan_days} days..."):
-                emails = scan_inbox(mail, limit_days=scan_days, max_emails=max_scan)
+        days_display = "ALL Time" if scan_days is None else f"Last {scan_days} Days"
+        with st.spinner(f"🔍 Scanning {days_display} — please wait... ⏳"):
+            emails = scan_inbox(mail, limit_days=scan_days, max_emails=max_scan)
         
         if not emails:
-            st.info("No emails found. Try increasing the scan period.")
+            st.info("No emails found. Try increasing the range.")
             mail.logout()
         else:
             df = pd.DataFrame(emails)
-            scope_text = "ALL time" if scan_days is None else f"last {scan_days} days"
-            st.success(f"✅ Scanned {len(emails)} emails from {scope_text}")
+            st.success(f"✅ Scanned {len(emails)} emails from {days_display}")
             
-            # Summary metrics
             cats = df["category"].value_counts()
             cols = st.columns(len(cats))
             for i, (cat, count) in enumerate(cats.items()):
                 cols[i].metric(cat, count)
             
             # ----------------------
-            # 🗑️ BULK CLEAN — EXPANDABLE GROUPS
+            # 🗑️ BULK CLEAN — GROUPED
             # ----------------------
             st.divider()
             st.header("🗑️ Bulk Clean — Grouped by Sender")
@@ -437,7 +467,7 @@ if connect_btn and email_addr and password:
             
             if len(marketing_df) > 0:
                 sender_groups = marketing_df.groupby("sender_email")
-                st.info(f"Found {sender_groups.ngroups} marketing senders — click to see emails")
+                st.info(f"Found {sender_groups.ngroups} marketing senders — click to expand")
                 
                 selected_senders = []
                 
@@ -468,7 +498,7 @@ if connect_btn and email_addr and password:
                             st.markdown(unsub_html, unsafe_allow_html=True)
                         
                         st.divider()
-                        st.markdown("**All emails in this period:**")
+                        st.markdown("**All emails in this range:**")
                         for idx, email_row in group_sorted.iterrows():
                             date_preview = str(email_row["date"])[:25]
                             st.markdown(f"• **{date_preview}**<br>&nbsp;&nbsp;{email_row['subject']}", unsafe_allow_html=True)
@@ -477,7 +507,7 @@ if connect_btn and email_addr and password:
                 
                 if selected_senders:
                     total_to_del = len(marketing_df[marketing_df["sender_email"].isin(selected_senders)])
-                    st.warning(f"⚠️ You've selected **{len(selected_senders)} sender(s)** → **{total_to_del} emails** will be moved to Trash")
+                    st.warning(f"⚠️ You've selected **{len(selected_senders)} sender(s)** → ~{total_to_del} emails will be moved to Trash")
                     confirm = st.button("🗑️ DELETE SELECTED EMAILS", type="primary")
                     
                     if confirm:
@@ -490,7 +520,7 @@ if connect_btn and email_addr and password:
                             st.warning(f"Some issues: {'; '.join(errors)}")
                         st.rerun()
             else:
-                st.success("No marketing emails to bulk-clean! 🎉")
+                st.success("No marketing emails in this range! 🎉")
             
             mail.logout()
             
@@ -506,9 +536,6 @@ if connect_btn and email_addr and password:
             tab_all, tab_marketing, tab_scam, tab_personal, tab_other = st.tabs([
                 "📋 All", "📢 Marketing", "⚠️ Scam", "👤 Personal", "❓ Other"
             ])
-            
-            with tab_all:
-                st.dataframe(df[["category", "sender_full", "subject", "date", "reason"]], use_container_width=True)
             
             with tab_marketing:
                 m_df = df[df["category"] == "📢 Marketing"].reset_index(drop=True)
@@ -527,32 +554,7 @@ if connect_btn and email_addr and password:
                     csv = m_df[["sender_email", "subject", "date", "unsubscribe_url"]].to_csv(index=False).encode("utf-8")
                     st.download_button("📥 Download Marketing List", csv,
                         f"marketing_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv", "text/csv")
-                else:
-                    st.success("No marketing emails! 🎉")
             
-            with tab_scam:
-                s_df = df[df["category"] == "⚠️ Scam/Suspicious"]
-                if len(s_df):
-                    st.dataframe(s_df[["sender_full", "subject", "date", "reason"]], use_container_width=True)
-                    st.warning("⚠️ Do NOT click links or reply to these!")
-                else:
-                    st.success("No suspicious emails! ✅")
-            
-            with tab_personal:
-                p_df = df[df["category"] == "👤 Personal"]
-                if len(p_df):
-                    st.dataframe(p_df[["sender_full", "subject", "date"]], use_container_width=True)
-                else:
-                    st.info("No clearly personal emails")
-            
-            with tab_other:
-                o_df = df[df["category"] == "❓ Other"]
-                if len(o_df):
-                    st.dataframe(o_df[["sender_full", "subject", "date", "reason"]], use_container_width=True)
-                else:
-                    st.success("Everything clearly categorised! 🎉")
-            
-            st.subheader("📤 Export Everything")
             st.download_button("📥 Download Full Report",
                 df.to_csv(index=False).encode("utf-8"),
                 f"inbox_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv", "text/csv")
