@@ -299,6 +299,20 @@ def check_premium_status():
 # ----------------------
 st.set_page_config(page_title=APP_NAME, layout="wide")
 
+# ✅ ↓ PASTE THESE LINES RIGHT HERE ↓ ✅
+st.markdown("""
+<style>
+/* Global text — white on dark */
+html, body, [class*="css"] { color: #ffffff !important; }
+h1, h2, h3, h4, h5, h6 { color: #ffffff !important; }
+small, .stCaption, .stHelp { color: #bbbbbb !important; }
+.streamlit-expanderHeader { color: #ffffff !important; }
+.stTextInput label, .stPassword label, .stSelectbox label, .stSlider label { color: #ffffff !important; }
+/* Keep alert boxes readable — dark text on light bg */
+.stAlert, .stInfo, .stWarning, .stSuccess, .stError { color: #000000 !important; }
+</style>
+""", unsafe_allow_html=True)
+
 st.title("🧹 " + APP_NAME)
 st.subheader("Scan, sort, unsubscribe, and clear bulk — safely")
 
