@@ -299,7 +299,7 @@ def check_premium_status():
 # ----------------------
 st.set_page_config(page_title=APP_NAME, layout="wide")
 
-# 🎨 COMPLETE STYLE FIX — ALL COLOURS & LINK STYLES
+# 🎨 COMPLETE STYLE FIX — LINKS BLUE + UNDERLINED
 st.markdown("""
 <style>
 /* Global text: white on dark background */
@@ -337,31 +337,8 @@ small, .stCaption, .stHelp {
     color: #000000 !important;
 }
 
-/* ALL BUY ME A COFFEE LINKS — BLUE + UNDERLINED + BOLD */
-a[href*="buymeacoffee.com"],
-a[href*="SUPPORT_LINK"] {
-    color: #4285F4 !important;
-    text-decoration: underline !important;
-    font-weight: bold !important;
-}
-
-/* Light-coloured banner boxes: dark text so it's readable */
-div[style*="background:#fff8e1"],
-div[style*="background: #fff8e1"],
-div[style*="background:#fff3e0"],
-div[style*="background: #fff3e0"],
-div[style*="background:#e8f5e9"],
-div[style*="background: #e8f5e9"] {
-    color: #000000 !important;
-}
-
-/* Links INSIDE light banners — also BLUE + UNDERLINED */
-div[style*="background:#fff8e1"] a,
-div[style*="background: #fff8e1"] a,
-div[style*="background:#fff3e0"] a,
-div[style*="background: #fff3e0"] a,
-div[style*="background:#e8f5e9"] a,
-div[style*="background: #e8f5e9"] a {
+/* ALL Buy Me A Coffee links — BLUE + UNDERLINED + BOLD */
+a[href*="buymeacoffee.com"] {
     color: #4285F4 !important;
     text-decoration: underline !important;
     font-weight: bold !important;
@@ -370,23 +347,14 @@ div[style*="background: #e8f5e9"] a {
 """, unsafe_allow_html=True)
 
 # ----------------------
-# 📌 PAGE CONTENT
+# 📌 PAGE CONTENT — CLEAN, NO BANNER
 # ----------------------
 st.title("🧹 " + APP_NAME)
 st.subheader("Scan, sort, unsubscribe, and clear bulk — safely")
-
-banner = f"""
-<div style="padding: 12px; background: linear-gradient(90deg, #fff8e1, #fff3e0); border-radius: 8px; margin-bottom: 20px;">
-💛 <b>Free for {FREE_DAYS_LIMIT} days / {FREE_EMAILS_LIMIT} emails.</b> Full unlimited forever: <b>{PREMIUM_PRICE}</b> ❤️
-"""
-if SUPPORT_LINK and "PASTE" not in SUPPORT_LINK:
-    banner += f'<br><a href="{SUPPORT_LINK}" target="_blank">⭐ Get Premium Access — {PREMIUM_PRICE}</a>'
-banner += "</div>"
-st.markdown(banner, unsafe_allow_html=True)
 st.divider()
 
 # ----------------------
-# 🔐 PREMIUM PANEL
+# 🔐 PREMIUM PANEL — ONLY ONE PLACE FOR PREMIUM INFO
 # ----------------------
 is_premium = check_premium_status()
 
@@ -501,7 +469,7 @@ else:
     scan_days = st.slider(f"Scan emails from last...", 7, FREE_DAYS_LIMIT, 30)
     max_scan = st.slider(f"Maximum emails to scan", 50, FREE_EMAILS_LIMIT, 200)
     if SUPPORT_LINK and "PASTE" not in SUPPORT_LINK:
-        st.markdown(f"Want to scan further back? ⭐ <a href='{SUPPORT_LINK}' target='_blank'>Unlock Premium — {PREMIUM_PRICE}</a>", unsafe_allow_html=True)
+        st.markdown(f"Want to scan further back? ⭐ [Unlock Premium — {PREMIUM_PRICE}]({SUPPORT_LINK})", unsafe_allow_html=True)
 
 connect_btn = st.button("🔌 Connect & Scan Inbox", type="primary")
 
