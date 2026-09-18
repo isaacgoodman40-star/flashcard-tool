@@ -1,4 +1,4 @@
-import streamlit as st:
+import streamlit as st
 from google_auth_oauthlib.flow import Flow
 
 st.set_page_config(
