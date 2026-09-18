@@ -1,4 +1,5 @@
-import streamlit as st
+import streamlit as st:
+from google_auth_oauthlib.flow import Flow
 
 st.set_page_config(
   page_title="Inbox Cleaner",
@@ -25,6 +26,7 @@ st.subheader("Gmail access")
 st.info("Gmail mailbox access has not been connected yet.")
 if st.button("connect Gmail mailbox"):
     st.info("Gmail authorisation is not configured yet.")
+st.success("Google OAuth library imported successfully.")
 
 
   
