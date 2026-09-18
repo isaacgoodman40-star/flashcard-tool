@@ -46,5 +46,14 @@ else:
 st.divider()
 st.subheader("Gmail access")
 st.info("Gmail mailbox access has not been connected yet.")
-if st.button("connect Gmail mailbox"):
-    st.info("Gmail authorisation is not configured yet.")
+f st.user.is_logged_in:
+    if st.button("Connect Gmail mailbox"):
+        flow = create_gmail_flow()
+
+        authorization_url, state = flow.authorization_url(
+            access_type="offline",
+            prompt="consent",
+        )
+
+        st.session_state["gmail_oauth_state"] = state
+        st.link_button("Continue to Google", authorization_url)
