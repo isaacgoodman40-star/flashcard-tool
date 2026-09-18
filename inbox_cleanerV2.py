@@ -1,6 +1,8 @@
 import streamlit as st
 from google_auth_oauthlib.flow import Flow
 
+GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.metadata"]
+
 st.set_page_config(
   page_title="Inbox Cleaner",
 )
