@@ -20,6 +20,13 @@ else:
   if st.button("Sign out"):
       st.logout()
 
+st.divider()
+st.subheader("Gmail access")
+if st.user.is_loggid_in:
+    st.info("You are signed in. Gmail mailbox access has not been connected yet.")
+else:
+  st.warning("Please sign in with Google before connecting Gmail.")
+
 
   
 
