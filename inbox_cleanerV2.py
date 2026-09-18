@@ -46,7 +46,7 @@ else:
 st.divider()
 st.subheader("Gmail access")
 st.info("Gmail mailbox access has not been connected yet.")
-f st.user.is_logged_in:
+if st.user.is_logged_in:
     if st.button("Connect Gmail mailbox"):
         flow = create_gmail_flow()
 
