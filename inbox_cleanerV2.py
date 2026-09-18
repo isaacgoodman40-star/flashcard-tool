@@ -23,6 +23,8 @@ else:
 st.divider()
 st.subheader("Gmail access")
 st.info("Gmail mailbox access has not been connected yet.")
+if st.button("connect Gmail mailbox"):
+    st.info("Gmail authorisation is not configured yet.")
 
 
   
