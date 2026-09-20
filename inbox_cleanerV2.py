@@ -35,8 +35,8 @@ st.subheader("Connect your mailbox")
 st.write("connect your email account securely using your provider's sign-in page.")
 
 if not st.user.is_logged_in:
-        if st.button("Sign in with Google"):
-            st.login("google")
+    if st.button("Sign in with Google"):
+        st.login("google")
 
 else:
   st.success("Google sign-in successful.")
