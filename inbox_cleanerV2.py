@@ -51,10 +51,3 @@ st.warning(
     "while we finish the secure authorisation process."
 )
 
-        authorization_url, state = flow.authorization_url(
-            access_type="offline",
-            prompt="consent",
-        )
-
-        st.session_state["gmail_oauth_state"] = state
-        st.link_button("Continue to Google", authorization_url)
