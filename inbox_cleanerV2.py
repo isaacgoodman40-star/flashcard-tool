@@ -1,30 +1,4 @@
 import streamlit as st
-import secrets
-from google_auth_oauthlib.flow import Flow
-
-GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.metadata"]
-
-
-def create_gmail_flow():
-    google_config = st.secrets["google_oauth"]
-
-    client_config = {
-        "web": {
-            "client_id": google_config["client_id"],
-            "client_secret": google_config["client_secret"],
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-        }
-    }
-
-    flow = Flow.from_client_config(
-        client_config,
-        scopes=GMAIL_SCOPES,
-        redirect_uri=google_config["redirect_uri"],
-    )
-
-    return flow
-
 
 st.set_page_config(
     page_title="Inbox Cleaner",
