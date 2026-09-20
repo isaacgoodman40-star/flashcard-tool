@@ -35,7 +35,7 @@ st.subheader("Connect your mailbox")
 st.write("connect your email account securely using your provider's sign-in page.")
 
 if not st.user.is_logged_in:
-st.warning("Gmail connection is temporarily disabled" "While we finish the secure authorisation process.")
+        st.warning("Gmail connection is temporarily disabled" "While we finish the secure authorisation process.")
 
 else:
   st.success("Google sign-in successful.")
