@@ -4,7 +4,7 @@ from google_auth_oauthlib.flow import Flow
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.metadata"]
 
 def create_gmail_flow():
-    google_config = st.secrets["auth"]["google"]
+    google_config = st.secrets["google_oauth"]
 
     client_config = {
         "web": {
