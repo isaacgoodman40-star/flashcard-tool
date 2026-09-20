@@ -4,6 +4,7 @@ from google_auth_oauthlib.flow import Flow
 
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.metadata"]
 
+
 def create_gmail_flow():
     google_config = st.secrets["google_oauth"]
 
@@ -24,31 +25,47 @@ def create_gmail_flow():
 
     return flow
 
+
 st.set_page_config(
-  page_title="Inbox Cleaner",
+    page_title="Inbox Cleaner",
 )
 
 st.title("Inbox Cleaner")
 st.write("A privacy-first way to clean your inbox.")
 st.success("The application is running.")
+
 st.divider()
+
 st.subheader("Connect your mailbox")
-st.write("connect your email account securely using your provider's sign-in page.")
+st.write(
+    "Connect your email account securely using your provider's sign-in page."
+)
 
 if not st.user.is_logged_in:
     if st.button("Sign in with Google"):
         st.login("google")
 
 else:
-  st.success("Google sign-in successful.")
-  if st.button("Sign out"):
-      st.logout()
+    st.success("Google sign-in successful.")
+
+    # Check whether Streamlit exposes an access token.
+    # Never display or log the token itself.
+    if st.button("Check Gmail token availability"):
+        token = st.user.get("access_token")
+
+        if isinstance(token, str) and token:
+            st.success("An access token is available.")
+        else:
+            st.warning("No access token is available through st.user.")
+
+    if st.button("Sign out"):
+        st.logout()
 
 st.divider()
+
 st.subheader("Gmail access")
 st.info("Gmail mailbox access has not been connected yet.")
 st.warning(
     "Gmail connection is temporarily disabled "
     "while we finish the secure authorisation process."
 )
-
