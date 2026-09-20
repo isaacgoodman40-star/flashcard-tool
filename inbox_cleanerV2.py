@@ -1,8 +1,6 @@
 import streamlit as st
 import requests
 
-GMAIL_METADATA_SCOPE = "https://www.googleapis.com/auth/gmail.metadata"
-
 st.set_page_config(
     page_title="Inbox Cleaner",
 )
@@ -25,36 +23,48 @@ if not st.user.is_logged_in:
 else:
     st.success("Google sign-in successful.")
 
-    if st.button("Verify Gmail permission"):
+    if st.button("Test Gmail connection"):
         try:
             token = st.user.tokens.access
 
             if not isinstance(token, str) or not token:
-                st.warning("No Google access token was returned.")
+                st.warning("No Google access token is available.")
 
             else:
                 response = requests.get(
-                    "https://oauth2.googleapis.com/tokeninfo",
-                    params={"access_token": token},
+                    "https://gmail.googleapis.com/gmail/v1/users/me/profile",
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                    },
                     timeout=10,
                 )
-                response.raise_for_status()
 
-                granted_scopes = response.json().get("scope", "").split()
+                if response.status_code == 200:
+                    st.success("Gmail API connection successful!")
 
-                if GMAIL_METADATA_SCOPE in granted_scopes:
-                    st.success("Gmail metadata permission confirmed!")
+                elif response.status_code == 401:
+                    st.error(
+                        "Google rejected the access token. "
+                        "Try signing out and signing back in."
+                    )
+
+                elif response.status_code == 403:
+                    st.error(
+                        "Gmail access was denied. "
+                        "We need to check the API permissions."
+                    )
+
                 else:
-                    st.warning(
-                        "Google access token found, but Gmail metadata "
-                        "permission was not confirmed."
+                    st.error(
+                        "Gmail connection failed. "
+                        f"HTTP status: {response.status_code}"
                     )
 
         except (AttributeError, KeyError):
-            st.error("Token access is not available in this configuration.")
+            st.error("Google access token is unavailable.")
 
         except requests.RequestException:
-            st.error("Could not verify the permission with Google.")
+            st.error("Could not reach the Gmail API.")
 
     if st.button("Sign out"):
         st.logout()
