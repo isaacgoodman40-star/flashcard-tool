@@ -22,6 +22,18 @@ if not st.user.is_logged_in:
 else:
     st.success("Google sign-in successful.")
 
+    if st.button("Check Gmail token availability"):
+        try:
+            token = st.user.tokens.access
+
+            if isinstance(token, str) and token:
+                st.success("Google access token is available.")
+            else:
+                st.warning("No Google access token was returned.")
+
+        except (AttributeError, KeyError):
+            st.error("Token access is not available in this configuration.")
+
     if st.button("Sign out"):
         st.logout()
 
