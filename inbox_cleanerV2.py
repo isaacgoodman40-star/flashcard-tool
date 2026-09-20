@@ -35,8 +35,8 @@ st.subheader("Connect your mailbox")
 st.write("connect your email account securely using your provider's sign-in page.")
 
 if not st.user.is_logged_in:
-        st.warning("Gmail connection is temporarily disabled " 
-                   "While we finish the secure authorisation process.")
+        if st.button("Sign in with Google"):
+        st.login("google")
 
 else:
   st.success("Google sign-in successful.")
@@ -46,9 +46,10 @@ else:
 st.divider()
 st.subheader("Gmail access")
 st.info("Gmail mailbox access has not been connected yet.")
-if st.user.is_logged_in:
-    if st.button("Connect Gmail mailbox"):
-        flow = create_gmail_flow()
+st.warning(
+    "Gmail connection is temporarily disabled "
+    "while we finish the secure authorisation process."
+)
 
         authorization_url, state = flow.authorization_url(
             access_type="offline",
