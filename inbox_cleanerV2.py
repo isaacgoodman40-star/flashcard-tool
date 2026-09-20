@@ -48,15 +48,13 @@ if not st.user.is_logged_in:
 else:
     st.success("Google sign-in successful.")
 
-    # Check whether Streamlit exposes an access token.
-    # Never display or log the token itself.
-    if st.button("Check Gmail token availability"):
-        token = st.user.get("google")
+if st.button("Check Gmail token availability"):
+    token = st.context.tokens.get("google")
 
-        if isinstance(token, str) and token:
-            st.success("An access token is available.")
-        else:
-            st.warning("No access token is available through st.user.")
+    if isinstance(token, str) and token:
+        st.success("Google access token found.")
+    else:
+        st.warning("No Google access token found in st.context.tokens.")
 
     if st.button("Sign out"):
         st.logout()
