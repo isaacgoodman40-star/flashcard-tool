@@ -1,4 +1,6 @@
+import ipaddress
 import re
+import socket
 from collections import defaultdict
 from urllib.parse import urlparse
 
@@ -23,8 +25,8 @@ def extract_https_unsubscribe_urls(header_value):
     """
     Extract HTTPS URLs from a List-Unsubscribe header.
 
-    Example:
-    <https://example.com/unsubscribe>, <mailto:unsubscribe@example.com>
+    This function only reads/parses the header.
+    It does NOT visit any unsubscribe URL.
     """
 
     if not header_value:
@@ -43,6 +45,7 @@ def extract_https_unsubscribe_urls(header_value):
             if (
                 parsed.scheme.lower() == "https"
                 and parsed.netloc
+                and parsed.hostname
             ):
                 https_urls.append(candidate)
 
@@ -50,6 +53,104 @@ def extract_https_unsubscribe_urls(header_value):
             continue
 
     return https_urls
+
+
+def validate_unsubscribe_url(url):
+    """
+    Perform a safety check on an unsubscribe URL.
+
+    The URL is NOT visited.
+
+    Checks:
+    - HTTPS only
+    - hostname must exist
+    - no username/password in URL
+    - no unusual port
+    - hostname must resolve
+    - every resolved IP must be globally reachable
+
+    Returns:
+        (safe, reason)
+    """
+
+    if not isinstance(url, str) or not url:
+        return False, "No unsubscribe URL was provided."
+
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False, "The unsubscribe URL could not be parsed."
+
+    # HTTPS only.
+    if parsed.scheme.lower() != "https":
+        return False, "The unsubscribe URL is not HTTPS."
+
+    # Hostname required.
+    hostname = parsed.hostname
+
+    if not hostname:
+        return False, "The unsubscribe URL has no hostname."
+
+    # Credentials inside URLs are not accepted.
+    if parsed.username is not None or parsed.password is not None:
+        return False, "The unsubscribe URL contains embedded credentials."
+
+    # For now, only standard HTTPS port 443 is accepted.
+    try:
+        port = parsed.port
+    except ValueError:
+        return False, "The unsubscribe URL contains an invalid port."
+
+    if port not in (None, 443):
+        return False, "The unsubscribe URL uses a non-standard HTTPS port."
+
+    # Resolve the hostname without making an HTTP request.
+    try:
+        address_info = socket.getaddrinfo(
+            hostname,
+            443,
+            type=socket.SOCK_STREAM,
+        )
+
+    except socket.gaierror:
+        return False, "The unsubscribe hostname could not be resolved."
+
+    except OSError:
+        return False, "The unsubscribe hostname could not be checked."
+
+    resolved_ips = set()
+
+    for address in address_info:
+
+        sockaddr = address[4]
+
+        if not sockaddr:
+            continue
+
+        ip_text = sockaddr[0]
+
+        try:
+            ip_address = ipaddress.ip_address(ip_text)
+        except ValueError:
+            return False, "The hostname returned an invalid IP address."
+
+        resolved_ips.add(ip_address)
+
+    if not resolved_ips:
+        return False, "The hostname did not resolve to an IP address."
+
+    # Reject the destination if ANY resolved address is not globally
+    # reachable.
+    for ip_address in resolved_ips:
+
+        if not ip_address.is_global:
+            return (
+                False,
+                "The unsubscribe hostname resolves to a "
+                "non-public network address.",
+            )
+
+    return True, "The unsubscribe destination passed the safety pre-check."
 
 
 # -------------------------------------------------
@@ -71,15 +172,24 @@ if "more_messages_available" not in st.session_state:
 # -------------------------------------------------
 
 st.title("Inbox Cleaner")
-st.write("A privacy-first way to clean your inbox.")
-st.success("The application is running.")
+
+st.write(
+    "A privacy-first way to clean your inbox."
+)
+
+st.success(
+    "The application is running."
+)
 
 st.divider()
 
-st.subheader("Connect your mailbox")
+st.subheader(
+    "Connect your mailbox"
+)
 
 st.write(
-    "Connect your email account securely using your provider's sign-in page."
+    "Connect your email account securely using "
+    "your provider's sign-in page."
 )
 
 
@@ -94,7 +204,9 @@ if not st.user.is_logged_in:
 
 else:
 
-    st.success("Google sign-in successful.")
+    st.success(
+        "Google sign-in successful."
+    )
 
     # -------------------------------------------------
     # Test Gmail connection
@@ -103,6 +215,7 @@ else:
     if st.button("Test Gmail connection"):
 
         try:
+
             token = st.user.tokens.access
 
             if not isinstance(token, str) or not token:
@@ -165,7 +278,9 @@ else:
 
     st.divider()
 
-    st.subheader("Mailing-list scan")
+    st.subheader(
+        "Mailing-list scan"
+    )
 
     st.write(
         "Scan your inbox and group messages by sender. "
@@ -174,7 +289,12 @@ else:
 
     scan_limit = st.selectbox(
         "How many emails would you like to scan?",
-        options=[10, 25, 50, 100],
+        options=[
+            10,
+            25,
+            50,
+            100,
+        ],
         index=2,
     )
 
@@ -384,7 +504,7 @@ else:
                             ] = unsubscribe_url
 
                     # -------------------------------------------------
-                    # Sort sender results
+                    # Sort results
                     # -------------------------------------------------
 
                     sorted_senders = sorted(
@@ -427,7 +547,7 @@ else:
                     )
 
                     # -------------------------------------------------
-                    # Clear previous selections
+                    # Clear old selections
                     # -------------------------------------------------
 
                     keys_to_remove = [
@@ -498,7 +618,9 @@ else:
 
         st.divider()
 
-        st.subheader("Senders found")
+        st.subheader(
+            "Senders found"
+        )
 
         st.write(
             f"{st.session_state.scan_message_count} "
@@ -535,8 +657,8 @@ else:
             )
 
             st.write(
-                f"{result.get('count', 0)} email(s) "
-                "in this scan"
+                f"{result.get('count', 0)} "
+                "email(s) in this scan"
             )
 
             if result.get(
@@ -595,7 +717,7 @@ else:
             )
 
         # -------------------------------------------------
-        # Review selected senders
+        # Review selected
         # -------------------------------------------------
 
         if st.button(
@@ -632,6 +754,10 @@ else:
                     )
                 )
 
+                # -------------------------------------------------
+                # One-click safety pre-check
+                # -------------------------------------------------
+
                 if result.get(
                     "one_click_eligible",
                     False,
@@ -639,10 +765,29 @@ else:
 
                     one_click_count += 1
 
-                    st.success(
-                        "Eligible for further "
-                        "one-click unsubscribe review."
+                    unsubscribe_url = result.get(
+                        "unsubscribe_url"
                     )
+
+                    safe, reason = validate_unsubscribe_url(
+                        unsubscribe_url
+                    )
+
+                    if safe:
+
+                        st.success(
+                            "One-click candidate passed "
+                            "the destination safety pre-check."
+                        )
+
+                    else:
+
+                        st.error(
+                            "One-click candidate failed "
+                            "the destination safety pre-check."
+                        )
+
+                    st.caption(reason)
 
                 elif result.get(
                     "unsubscribe",
@@ -672,7 +817,9 @@ else:
 
             st.divider()
 
-            st.subheader("Review summary")
+            st.subheader(
+                "Review summary"
+            )
 
             st.write(
                 f"Selected senders: "
@@ -700,8 +847,8 @@ else:
             )
 
             st.warning(
-                "Review only — Inbox Cleaner has not "
-                "visited any unsubscribe links, sent any "
+                "Safety review only — Inbox Cleaner has "
+                "not visited any unsubscribe URLs, sent any "
                 "unsubscribe requests, deleted any emails, "
                 "or modified your Gmail account."
             )
@@ -727,7 +874,9 @@ else:
 
 st.divider()
 
-st.subheader("Gmail access")
+st.subheader(
+    "Gmail access"
+)
 
 st.info(
     "Inbox Cleaner currently uses "
