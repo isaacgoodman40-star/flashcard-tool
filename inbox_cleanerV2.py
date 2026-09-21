@@ -23,6 +23,10 @@ if not st.user.is_logged_in:
 else:
     st.success("Google sign-in successful.")
 
+    # -------------------------------------------------
+    # Test Gmail connection
+    # -------------------------------------------------
+
     if st.button("Test Gmail connection"):
         try:
             token = st.user.tokens.access
@@ -63,12 +67,16 @@ else:
         except requests.RequestException:
             st.error("Could not reach the Gmail API.")
 
+    # -------------------------------------------------
+    # Read-only inbox preview
+    # -------------------------------------------------
+
     st.divider()
     st.subheader("Read-only inbox preview")
 
     st.write(
-        "Check up to 10 inbox messages without opening "
-        "or changing any emails."
+        "Preview sender and mailing-list information "
+        "without reading email bodies."
     )
 
     if st.button("Preview inbox"):
@@ -79,6 +87,7 @@ else:
                 st.warning("No Google access token is available.")
 
             else:
+                # First get up to 10 message IDs from the inbox.
                 response = requests.get(
                     "https://gmail.googleapis.com/gmail/v1/users/me/messages",
                     headers={
@@ -94,11 +103,99 @@ else:
                 if response.status_code == 200:
                     messages = response.json().get("messages", [])
 
-                    st.success("Inbox preview successful!")
-                    st.write(
-                        f"Found {len(messages)} messages "
-                        "in this preview (maximum 10)."
+                    st.success(
+                        f"Found {len(messages)} message(s) in this preview."
                     )
+
+                    # Retrieve metadata only for each message.
+                    for message in messages:
+                        message_id = message.get("id")
+
+                        if not message_id:
+                            continue
+
+                        metadata_response = requests.get(
+                            (
+                                "https://gmail.googleapis.com/gmail/v1/"
+                                f"users/me/messages/{message_id}"
+                            ),
+                            headers={
+                                "Authorization": f"Bearer {token}",
+                            },
+                            params=[
+                                ("format", "metadata"),
+                                ("metadataHeaders", "From"),
+                                ("metadataHeaders", "Subject"),
+                                ("metadataHeaders", "List-Unsubscribe"),
+                                (
+                                    "metadataHeaders",
+                                    "List-Unsubscribe-Post",
+                                ),
+                            ],
+                            timeout=10,
+                        )
+
+                        if metadata_response.status_code != 200:
+                            st.warning(
+                                "One message's metadata could not be retrieved."
+                            )
+                            continue
+
+                        message_data = metadata_response.json()
+
+                        headers = (
+                            message_data
+                            .get("payload", {})
+                            .get("headers", [])
+                        )
+
+                        header_values = {
+                            header.get("name", "").lower(): header.get(
+                                "value", ""
+                            )
+                            for header in headers
+                        }
+
+                        sender = header_values.get(
+                            "from",
+                            "Unknown sender",
+                        )
+
+                        subject = header_values.get(
+                            "subject",
+                            "(No subject)",
+                        )
+
+                        has_unsubscribe = bool(
+                            header_values.get("list-unsubscribe")
+                        )
+
+                        has_one_click = (
+                            header_values.get(
+                                "list-unsubscribe-post",
+                                ""
+                            ).lower()
+                            == "list-unsubscribe=one-click"
+                        )
+
+                        st.markdown("---")
+                        st.write(f"**From:** {sender}")
+                        st.write(f"**Subject:** {subject}")
+
+                        if has_one_click:
+                            st.success(
+                                "One-click unsubscribe supported."
+                            )
+
+                        elif has_unsubscribe:
+                            st.info(
+                                "Unsubscribe information detected."
+                            )
+
+                        else:
+                            st.caption(
+                                "No standard unsubscribe information detected."
+                            )
 
                 elif response.status_code == 401:
                     st.error(
@@ -123,16 +220,21 @@ else:
         except (requests.RequestException, ValueError):
             st.error("Could not retrieve the inbox preview.")
 
+    # -------------------------------------------------
+    # Sign out
+    # -------------------------------------------------
+
     if st.button("Sign out"):
         st.logout()
 
 st.divider()
 
 st.subheader("Gmail access")
+
 st.info(
-    "Mailbox scanning and cleanup features are not enabled yet."
+    "Inbox Cleaner currently uses read-only Gmail metadata access."
 )
+
 st.warning(
-    "Inbox preview is read-only. "
     "No emails will be deleted, modified or unsubscribed."
 )
