@@ -23,7 +23,7 @@ def extract_https_unsubscribe_urls(header_value):
     """
     Extract HTTPS URLs from a List-Unsubscribe header.
 
-    Example header:
+    Example:
     <https://example.com/unsubscribe>, <mailto:unsubscribe@example.com>
     """
 
@@ -522,7 +522,10 @@ else:
             st.session_state.scan_results
         ):
 
-            sender = result["sender"]
+            sender = result.get(
+                "sender",
+                "Unknown sender",
+            )
 
             st.markdown("---")
 
@@ -532,17 +535,23 @@ else:
             )
 
             st.write(
-                f"{result['count']} email(s) "
+                f"{result.get('count', 0)} email(s) "
                 "in this scan"
             )
 
-            if result["one_click_eligible"]:
+            if result.get(
+                "one_click_eligible",
+                False,
+            ):
 
                 st.success(
                     "One-click unsubscribe candidate."
                 )
 
-            elif result["unsubscribe"]:
+            elif result.get(
+                "unsubscribe",
+                False,
+            ):
 
                 st.info(
                     "Manual unsubscribe information detected."
@@ -566,7 +575,10 @@ else:
         if selected_senders:
 
             total_selected_emails = sum(
-                sender["count"]
+                sender.get(
+                    "count",
+                    0,
+                )
                 for sender
                 in selected_senders
             )
@@ -606,18 +618,24 @@ else:
                 st.markdown("---")
 
                 st.write(
-                    f"**{result['sender']}**"
+                    f"**{result.get('sender', 'Unknown sender')}**"
                 )
 
                 st.write(
-                    f"{result['count']} email(s)"
+                    f"{result.get('count', 0)} email(s)"
                 )
 
                 total_selected_emails += (
-                    result["count"]
+                    result.get(
+                        "count",
+                        0,
+                    )
                 )
 
-                if result["one_click_eligible"]:
+                if result.get(
+                    "one_click_eligible",
+                    False,
+                ):
 
                     one_click_count += 1
 
@@ -626,7 +644,10 @@ else:
                         "one-click unsubscribe review."
                     )
 
-                elif result["unsubscribe"]:
+                elif result.get(
+                    "unsubscribe",
+                    False,
+                ):
 
                     manual_count += 1
 
