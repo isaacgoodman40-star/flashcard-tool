@@ -49,10 +49,7 @@ else:
                     )
 
                 elif response.status_code == 403:
-                    st.error(
-                        "Gmail access was denied. "
-                        "We need to check the API permissions."
-                    )
+                    st.error("Gmail access was denied.")
 
                 else:
                     st.error(
@@ -66,14 +63,76 @@ else:
         except requests.RequestException:
             st.error("Could not reach the Gmail API.")
 
+    st.divider()
+    st.subheader("Read-only inbox preview")
+
+    st.write(
+        "Check up to 10 inbox messages without opening "
+        "or changing any emails."
+    )
+
+    if st.button("Preview inbox"):
+        try:
+            token = st.user.tokens.access
+
+            if not isinstance(token, str) or not token:
+                st.warning("No Google access token is available.")
+
+            else:
+                response = requests.get(
+                    "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                    },
+                    params={
+                        "maxResults": 10,
+                        "labelIds": "INBOX",
+                    },
+                    timeout=10,
+                )
+
+                if response.status_code == 200:
+                    messages = response.json().get("messages", [])
+
+                    st.success("Inbox preview successful!")
+                    st.write(
+                        f"Found {len(messages)} messages "
+                        "in this preview (maximum 10)."
+                    )
+
+                elif response.status_code == 401:
+                    st.error(
+                        "Your Google access token was rejected. "
+                        "Try signing out and signing back in."
+                    )
+
+                elif response.status_code == 403:
+                    st.error(
+                        "Gmail denied permission to list messages."
+                    )
+
+                else:
+                    st.error(
+                        "Inbox preview failed. "
+                        f"HTTP status: {response.status_code}"
+                    )
+
+        except (AttributeError, KeyError):
+            st.error("Google access token is unavailable.")
+
+        except (requests.RequestException, ValueError):
+            st.error("Could not retrieve the inbox preview.")
+
     if st.button("Sign out"):
         st.logout()
 
 st.divider()
 
 st.subheader("Gmail access")
-st.info("Gmail mailbox access has not been connected yet.")
+st.info(
+    "Mailbox scanning and cleanup features are not enabled yet."
+)
 st.warning(
-    "Gmail connection is temporarily disabled "
-    "while we finish the secure authorisation process."
+    "Inbox preview is read-only. "
+    "No emails will be deleted, modified or unsubscribed."
 )
