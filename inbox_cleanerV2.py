@@ -76,8 +76,14 @@ else:
     st.subheader("Mailing-list scan")
 
     st.write(
-        "Scan up to 50 inbox messages and group them by sender. "
+        "Scan your inbox and group messages by sender. "
         "Only selected Gmail metadata is requested."
+    )
+
+    scan_limit = st.selectbox(
+        "How many emails would you like to scan?",
+        options=[10, 25, 50, 100],
+        index=2,
     )
 
     if st.button("Scan inbox"):
@@ -94,7 +100,7 @@ else:
                         "Authorization": f"Bearer {token}",
                     },
                     params={
-                        "maxResults": 50,
+                        "maxResults": scan_limit,
                         "labelIds": "INBOX",
                     },
                     timeout=10,
@@ -115,6 +121,7 @@ else:
                             "More inbox messages are available. "
                             "This scan only processed the first page."
                         )
+
                     else:
                         st.caption(
                             "Gmail did not return another page for this scan."
