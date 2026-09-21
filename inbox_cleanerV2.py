@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+from collections import defaultdict
 
 st.set_page_config(
     page_title="Inbox Cleaner",
@@ -68,18 +69,18 @@ else:
             st.error("Could not reach the Gmail API.")
 
     # -------------------------------------------------
-    # Read-only inbox preview
+    # Mailing-list scan
     # -------------------------------------------------
 
     st.divider()
-    st.subheader("Read-only inbox preview")
+    st.subheader("Mailing-list scan")
 
     st.write(
-        "Preview sender and mailing-list information "
-        "without reading email bodies."
+        "Scan up to 50 inbox messages and group them by sender. "
+        "Only selected Gmail metadata is requested."
     )
 
-    if st.button("Preview inbox"):
+    if st.button("Scan inbox"):
         try:
             token = st.user.tokens.access
 
@@ -87,27 +88,48 @@ else:
                 st.warning("No Google access token is available.")
 
             else:
-                # First get up to 10 message IDs from the inbox.
                 response = requests.get(
                     "https://gmail.googleapis.com/gmail/v1/users/me/messages",
                     headers={
                         "Authorization": f"Bearer {token}",
                     },
                     params={
-                        "maxResults": 10,
+                        "maxResults": 50,
                         "labelIds": "INBOX",
                     },
                     timeout=10,
                 )
 
                 if response.status_code == 200:
-                    messages = response.json().get("messages", [])
+                    data = response.json()
+
+                    messages = data.get("messages", [])
+                    next_page_token = data.get("nextPageToken")
 
                     st.success(
-                        f"Found {len(messages)} message(s) in this preview."
+                        f"Scan returned {len(messages)} inbox message(s)."
                     )
 
-                    # Retrieve metadata only for each message.
+                    if next_page_token:
+                        st.info(
+                            "More inbox messages are available. "
+                            "This scan only processed the first page."
+                        )
+                    else:
+                        st.caption(
+                            "Gmail did not return another page for this scan."
+                        )
+
+                    senders = defaultdict(
+                        lambda: {
+                            "count": 0,
+                            "unsubscribe": False,
+                            "one_click": False,
+                        }
+                    )
+
+                    failed_metadata_requests = 0
+
                     for message in messages:
                         message_id = message.get("id")
 
@@ -125,8 +147,10 @@ else:
                             params=[
                                 ("format", "metadata"),
                                 ("metadataHeaders", "From"),
-                                ("metadataHeaders", "Subject"),
-                                ("metadataHeaders", "List-Unsubscribe"),
+                                (
+                                    "metadataHeaders",
+                                    "List-Unsubscribe",
+                                ),
                                 (
                                     "metadataHeaders",
                                     "List-Unsubscribe-Post",
@@ -136,9 +160,7 @@ else:
                         )
 
                         if metadata_response.status_code != 200:
-                            st.warning(
-                                "One message's metadata could not be retrieved."
-                            )
+                            failed_metadata_requests += 1
                             continue
 
                         message_data = metadata_response.json()
@@ -150,20 +172,14 @@ else:
                         )
 
                         header_values = {
-                            header.get("name", "").lower(): header.get(
-                                "value", ""
-                            )
+                            header.get("name", "").lower():
+                            header.get("value", "")
                             for header in headers
                         }
 
                         sender = header_values.get(
                             "from",
                             "Unknown sender",
-                        )
-
-                        subject = header_values.get(
-                            "subject",
-                            "(No subject)",
                         )
 
                         has_unsubscribe = bool(
@@ -178,24 +194,59 @@ else:
                             == "list-unsubscribe=one-click"
                         )
 
-                        st.markdown("---")
-                        st.write(f"**From:** {sender}")
-                        st.write(f"**Subject:** {subject}")
+                        senders[sender]["count"] += 1
+
+                        if has_unsubscribe:
+                            senders[sender]["unsubscribe"] = True
 
                         if has_one_click:
+                            senders[sender]["one_click"] = True
+
+                    # Sort senders by number of messages.
+                    sorted_senders = sorted(
+                        senders.items(),
+                        key=lambda item: item[1]["count"],
+                        reverse=True,
+                    )
+
+                    st.subheader("Senders found")
+
+                    if not sorted_senders:
+                        st.info(
+                            "No sender metadata was found in this scan."
+                        )
+
+                    for sender, details in sorted_senders:
+                        st.markdown("---")
+
+                        st.write(f"**{sender}**")
+
+                        st.write(
+                            f"{details['count']} email(s) "
+                            "in this scan"
+                        )
+
+                        if details["one_click"]:
                             st.success(
                                 "One-click unsubscribe supported."
                             )
 
-                        elif has_unsubscribe:
+                        elif details["unsubscribe"]:
                             st.info(
                                 "Unsubscribe information detected."
                             )
 
                         else:
                             st.caption(
-                                "No standard unsubscribe information detected."
+                                "No standard unsubscribe information "
+                                "detected."
                             )
+
+                    if failed_metadata_requests:
+                        st.warning(
+                            f"{failed_metadata_requests} message(s) "
+                            "could not be inspected."
+                        )
 
                 elif response.status_code == 401:
                     st.error(
@@ -210,7 +261,7 @@ else:
 
                 else:
                     st.error(
-                        "Inbox preview failed. "
+                        "Inbox scan failed. "
                         f"HTTP status: {response.status_code}"
                     )
 
@@ -218,7 +269,7 @@ else:
             st.error("Google access token is unavailable.")
 
         except (requests.RequestException, ValueError):
-            st.error("Could not retrieve the inbox preview.")
+            st.error("Could not complete the inbox scan.")
 
     # -------------------------------------------------
     # Sign out
