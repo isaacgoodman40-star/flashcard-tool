@@ -6,6 +6,24 @@ st.set_page_config(
     page_title="Inbox Cleaner",
 )
 
+# -------------------------------------------------
+# Session state
+# -------------------------------------------------
+
+if "scan_results" not in st.session_state:
+    st.session_state.scan_results = []
+
+if "scan_message_count" not in st.session_state:
+    st.session_state.scan_message_count = 0
+
+if "more_messages_available" not in st.session_state:
+    st.session_state.more_messages_available = False
+
+
+# -------------------------------------------------
+# Page header
+# -------------------------------------------------
+
 st.title("Inbox Cleaner")
 st.write("A privacy-first way to clean your inbox.")
 st.success("The application is running.")
@@ -16,6 +34,11 @@ st.subheader("Connect your mailbox")
 st.write(
     "Connect your email account securely using your provider's sign-in page."
 )
+
+
+# -------------------------------------------------
+# Google sign-in
+# -------------------------------------------------
 
 if not st.user.is_logged_in:
     if st.button("Sign in with Google"):
@@ -112,21 +135,6 @@ else:
                     messages = data.get("messages", [])
                     next_page_token = data.get("nextPageToken")
 
-                    st.success(
-                        f"Scan returned {len(messages)} inbox message(s)."
-                    )
-
-                    if next_page_token:
-                        st.info(
-                            "More inbox messages are available. "
-                            "This scan only processed the first page."
-                        )
-
-                    else:
-                        st.caption(
-                            "Gmail did not return another page for this scan."
-                        )
-
                     senders = defaultdict(
                         lambda: {
                             "count": 0,
@@ -209,45 +217,43 @@ else:
                         if has_one_click:
                             senders[sender]["one_click"] = True
 
-                    # Sort senders by number of messages.
+                    # Sort sender results by email count.
                     sorted_senders = sorted(
                         senders.items(),
                         key=lambda item: item[1]["count"],
                         reverse=True,
                     )
 
-                    st.subheader("Senders found")
+                    # Store only the scan results we need.
+                    st.session_state.scan_results = [
+                        {
+                            "sender": sender,
+                            "count": details["count"],
+                            "unsubscribe": details["unsubscribe"],
+                            "one_click": details["one_click"],
+                        }
+                        for sender, details in sorted_senders
+                    ]
 
-                    if not sorted_senders:
-                        st.info(
-                            "No sender metadata was found in this scan."
-                        )
+                    st.session_state.scan_message_count = len(messages)
 
-                    for sender, details in sorted_senders:
-                        st.markdown("---")
+                    st.session_state.more_messages_available = bool(
+                        next_page_token
+                    )
 
-                        st.write(f"**{sender}**")
+                    # Remove old selections when a new scan runs.
+                    keys_to_remove = [
+                        key
+                        for key in st.session_state.keys()
+                        if key.startswith("sender_select_")
+                    ]
 
-                        st.write(
-                            f"{details['count']} email(s) "
-                            "in this scan"
-                        )
+                    for key in keys_to_remove:
+                        del st.session_state[key]
 
-                        if details["one_click"]:
-                            st.success(
-                                "One-click unsubscribe supported."
-                            )
-
-                        elif details["unsubscribe"]:
-                            st.info(
-                                "Unsubscribe information detected."
-                            )
-
-                        else:
-                            st.caption(
-                                "No standard unsubscribe information "
-                                "detected."
-                            )
+                    st.success(
+                        f"Scan returned {len(messages)} inbox message(s)."
+                    )
 
                     if failed_metadata_requests:
                         st.warning(
@@ -279,11 +285,126 @@ else:
             st.error("Could not complete the inbox scan.")
 
     # -------------------------------------------------
+    # Persistent scan results
+    # -------------------------------------------------
+
+    if st.session_state.scan_results:
+
+        st.divider()
+        st.subheader("Senders found")
+
+        st.write(
+            f"{st.session_state.scan_message_count} email(s) "
+            "were included in the latest scan."
+        )
+
+        if st.session_state.more_messages_available:
+            st.info(
+                "More inbox messages are available beyond this scan."
+            )
+
+        selected_senders = []
+
+        for index, result in enumerate(
+            st.session_state.scan_results
+        ):
+            sender = result["sender"]
+
+            st.markdown("---")
+
+            selected = st.checkbox(
+                sender,
+                key=f"sender_select_{index}",
+            )
+
+            st.write(
+                f"{result['count']} email(s) in this scan"
+            )
+
+            if result["one_click"]:
+                st.success(
+                    "One-click unsubscribe supported."
+                )
+
+            elif result["unsubscribe"]:
+                st.info(
+                    "Unsubscribe information detected."
+                )
+
+            else:
+                st.caption(
+                    "No standard unsubscribe information detected."
+                )
+
+            if selected:
+                selected_senders.append(result)
+
+        # -------------------------------------------------
+        # Review selection
+        # -------------------------------------------------
+
+        st.divider()
+
+        if selected_senders:
+            total_selected_emails = sum(
+                sender["count"]
+                for sender in selected_senders
+            )
+
+            st.write(
+                f"**{len(selected_senders)} sender(s) selected**"
+            )
+
+            st.write(
+                f"These senders represent "
+                f"**{total_selected_emails} email(s)** "
+                "in this scan."
+            )
+
+        if st.button(
+            "Review selected",
+            disabled=not selected_senders,
+        ):
+            st.subheader("Review selected senders")
+
+            total_selected_emails = 0
+
+            for result in selected_senders:
+                st.write(
+                    f"**{result['sender']}** — "
+                    f"{result['count']} email(s)"
+                )
+
+                total_selected_emails += result["count"]
+
+            st.info(
+                f"{len(selected_senders)} sender(s) selected, "
+                f"representing {total_selected_emails} email(s)."
+            )
+
+            st.warning(
+                "Review only — no changes have been made "
+                "to your Gmail account."
+            )
+
+    # -------------------------------------------------
     # Sign out
     # -------------------------------------------------
 
+    st.divider()
+
     if st.button("Sign out"):
+        # Clear scan information before signing out.
+        st.session_state.scan_results = []
+        st.session_state.scan_message_count = 0
+        st.session_state.more_messages_available = False
+
         st.logout()
+
+
+# -------------------------------------------------
+# Gmail access information
+# -------------------------------------------------
 
 st.divider()
 
